@@ -284,6 +284,70 @@ body {
   padding: 6px;
 }
 
+/* ---- Bliss 壁纸：蓝天 + 白云 + 起伏绿丘（纯 CSS，不引用外部图片） ---- */
+
+.xp-wallpaper {
+  position: absolute;
+  inset: 0 0 30px 0;
+  overflow: hidden;
+  background: #3f7fd0;
+}
+
+/* 天空：上深下浅的蓝色渐变 + 两团柔和的白云 */
+.xp-wallpaper-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    /* 左上角的大朵积云：几个交叠的椭圆团 */
+    radial-gradient(ellipse 20% 12% at 17% 13%, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 15% 9% at 25% 15%, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 13% 7% at 9% 16%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 72%),
+    /* 右上方的云团 */
+    radial-gradient(ellipse 17% 10% at 68% 10%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(ellipse 12% 7% at 76% 13%, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, #1b4a9c 0%, #3f7fd0 42%, #86b6e8 74%, #cfe3f5 100%);
+}
+
+/* 高空的薄云：横向拉长的白色带 */
+.xp-wallpaper-cloud {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4%;
+  height: 24%;
+  background:
+    radial-gradient(ellipse 14% 40% at 48% 44%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 72%),
+    radial-gradient(ellipse 9% 30% at 88% 66%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 72%);
+  pointer-events: none;
+}
+
+/* 绿丘：椭圆上凸的草坡，近处更暗更饱和 */
+.xp-wallpaper-hill {
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -22%;
+  height: 62%;
+  border-radius: 50% 50% 0 0 / 42% 42% 0 0;
+  background:
+    /* 坡顶受光的高光带 */
+    radial-gradient(ellipse 62% 62% at 34% 72%, rgba(122, 186, 82, 0.95) 0%, rgba(122, 186, 82, 0) 72%),
+    radial-gradient(ellipse 60% 100% at 34% 100%, #4e9436 0%, #377425 58%, #24531a 100%);
+}
+
+/* 远处那一层丘陵：偏黄绿，坡顶高于近处山丘，形成 Bliss 的层叠景深 */
+.xp-wallpaper-hill.far {
+  left: 22%;
+  right: -22%;
+  bottom: -6%;
+  height: 46%;
+  border-radius: 58% 42% 0 0 / 58% 42% 0 0;
+  background:
+    radial-gradient(ellipse 66% 84% at 58% 66%, rgba(147, 200, 105, 0.9) 0%, rgba(147, 200, 105, 0) 74%),
+    radial-gradient(ellipse 64% 100% at 58% 100%, #7cb458 0%, #588f3a 62%, #3d6b28 100%);
+  opacity: 0.96;
+}
+
 .xp-desktop-icon {
   width: 76px;
   display: flex;
@@ -745,4 +809,91 @@ body {
   font-size: 11px;
   background: var(--xp-face-light);
   border: 1px solid var(--xp-border-out);
+}
+
+/* ---- XP 动效 ----
+ *
+ * 所有动画都放在 prefers-reduced-motion: no-preference 之下：
+ * 用户表达「减少动效」偏好时一律不播放。
+ *
+ * 动画只作用于 opacity / scale / translate，不改变布局尺寸，
+ * 因此动画期间窗口仍可正常点击与拖拽。
+ * 窗口动画刻意用独立的 scale 属性（而非 transform: scale()），
+ * 避免覆盖拖拽时写入的行内 transform。
+ */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* 窗口打开：轻微缩放淡入
+   *
+   * 这里用独立的 scale 属性而不是 transform: scale()：
+   * transform 会被 CSS 动画接管，从而覆盖拖拽时写入的行内 transform，
+   * 导致「动画期间窗口拖不动」。scale 与 transform 相互独立、可以共存。
+   */
+  .xp-window {
+    animation: xp-window-open 140ms ease-out;
+  }
+
+  @keyframes xp-window-open {
+    from {
+      opacity: 0;
+      scale: 0.94;
+    }
+    to {
+      opacity: 1;
+      scale: 1;
+    }
+  }
+
+  /* 开始菜单弹出：自下而上滑入 */
+  .xp-start-menu {
+    animation: xp-menu-in 110ms ease-out;
+  }
+
+  @keyframes xp-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 桌面通知气泡：从右侧滑入 */
+  .xp-notification {
+    animation: xp-notify-in 180ms ease-out;
+  }
+
+  @keyframes xp-notify-in {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* 任务栏按钮的激活态切换 */
+  .xp-taskbar-button {
+    transition: background 120ms ease-out, box-shadow 120ms ease-out;
+  }
+
+  .xp-taskbar-button:hover {
+    filter: brightness(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xp-window,
+  .xp-start-menu,
+  .xp-notification {
+    animation: none !important;
+  }
+
+  .xp-taskbar-button {
+    transition: none !important;
+  }
 }

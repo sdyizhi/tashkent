@@ -1,13 +1,16 @@
+/**
+ * Bliss 壁纸。
+ *
+ * 不引用外部图片（避免网络依赖与版权风险），用多层 CSS 渐变模拟 XP 经典壁纸：
+ * 蓝天 + 白云 + 远近两层起伏绿丘。
+ */
 export default function Wallpaper() {
   return (
-    <div
-      data-testid="wallpaper"
-      style={{
-        position: 'absolute',
-        inset: '0 0 30px 0',
-        background:
-          'radial-gradient(ellipse at 30% 20%, #8fb4e8 0%, #4b7bc4 45%, #1e3f6b 100%)',
-      }}
-    />
+    <div className="xp-wallpaper" data-testid="wallpaper">
+      <div className="xp-wallpaper-sky" data-testid="wallpaper-sky" />
+      <div className="xp-wallpaper-cloud" data-testid="wallpaper-cloud" />
+      <div className="xp-wallpaper-hill far" data-testid="wallpaper-hill-far" />
+      <div className="xp-wallpaper-hill" data-testid="wallpaper-hill" />
+    </div>
   );
 }
