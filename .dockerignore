@@ -1,0 +1,25 @@
+# 依赖与构建产物一律在镜像内重建，避免宿主机（尤其是 Windows）的 node_modules
+# 覆盖容器内 Linux 依赖：COPY apps/server 会连带复制 apps/server/node_modules。
+node_modules
+**/node_modules
+
+# 构建产物在镜像内重新生成
+dist
+**/dist
+
+# 运行时数据不进镜像（由 compose volume 挂载）
+data
+**/data
+
+# 本地验证产物
+.runtime-sim
+.deploy-test
+.prod-test
+test-results
+playwright-report
+
+# 版本控制与密钥
+.git
+.gitignore
+.env
+*.log

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node -e \"require('node:fs').cpSync('src/db/schema.sql','dist/db/schema.sql')\"",
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",

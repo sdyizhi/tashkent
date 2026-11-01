@@ -6,6 +6,7 @@ import { toolRoutes } from './routes/tools.js';
 import { eventRoutes } from './routes/events.js';
 import { desktopRoutes } from './routes/desktop.js';
 import { desktopStateRoutes } from './routes/desktop-state.js';
+import { registerStaticAssets } from './lib/static-assets.js';
 import type { Runtime } from './runtime.js';
 
 export function createApp(rt: Runtime) {
@@ -45,6 +46,9 @@ export function createApp(rt: Runtime) {
   );
   app.route('/', desktopRoutes(rt.windowService, (event) => rt.bus.publish(event)));
   app.route('/', desktopStateRoutes(rt.desktopState));
+
+  // 静态托管放在所有 API 路由之后：API 先匹配，未命中的路径才落到前端产物
+  registerStaticAssets(app);
 
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: '资源不存在' } }, 404));
   app.onError((err, c) => {

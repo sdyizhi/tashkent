@@ -5,3 +5,6 @@ data/
 .env
 test-results/
 playwright-report/
+
+# 无 Docker 环境的本地 runtime 模拟产物（scripts/simulate-runtime.ps1）
+.runtime-sim/
