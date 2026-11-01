@@ -500,3 +500,155 @@ body {
   color: #555;
   background: var(--xp-face);
 }
+
+/* ---- 记事本 ---- */
+
+.xp-notes {
+  display: flex;
+  height: 100%;
+}
+
+.xp-notes-side {
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #aca899;
+  background: var(--xp-face);
+}
+
+.xp-notes-list { flex: 1; overflow: auto; padding: 2px; }
+
+.xp-file-item[data-active="true"] { background: var(--xp-blue-start); color: #fff; }
+
+.xp-notes-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.xp-notes-main .xp-toolbar { justify-content: space-between; }
+
+.xp-notes-editor {
+  flex: 1;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 4px 6px;
+  font-family: var(--xp-font);
+  font-size: 12px;
+  line-height: 1.5;
+  background: #fff;
+  color: #000;
+}
+
+/* ---- 浏览器 ---- */
+
+.xp-browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.xp-browser-input {
+  flex: 1;
+  font-family: var(--xp-font);
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.xp-browser-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.xp-browser-frame-wrap {
+  flex: 1;
+  position: relative;
+  background: #fff;
+  border-top: 1px solid #aca899;
+  min-width: 0;
+}
+
+.xp-browser-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.xp-browser-frame-notice {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  color: #555;
+  background: var(--xp-face-light);
+}
+
+.xp-browser-side {
+  width: 190px;
+  border-left: 1px solid #aca899;
+  background: var(--xp-face);
+  overflow: auto;
+}
+
+.xp-browser-side-title {
+  padding: 4px 6px;
+  font-weight: bold;
+  background: linear-gradient(180deg, var(--xp-blue-start) 0%, var(--xp-blue-end) 100%);
+  color: #fff;
+}
+
+/* ---- 命令提示符 ---- */
+
+.xp-terminal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #000;
+  color: #c0c0c0;
+  font-family: 'Lucida Console', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.xp-terminal-output {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.xp-terminal-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-top: 1px solid #404040;
+}
+
+.xp-terminal-prompt { color: #c0c0c0; }
+
+.xp-terminal-input {
+  flex: 1;
+  background: #000;
+  color: #c0c0c0;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.xp-terminal-input:disabled { color: #808080; }
+
+.xp-terminal .xp-statusbar {
+  background: var(--xp-face);
+  color: #555;
+}

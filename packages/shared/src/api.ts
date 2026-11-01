@@ -68,4 +68,20 @@ export interface FileContentResponse {
   content: string;
 }
 
+/**
+ * 对外可见的运行时配置（不含任何凭据）。
+ */
+export interface PublicConfig {
+  provider: string;
+  model: string;
+  temperature: number;
+  maxSteps: number;
+  maxOutputTokens: number;
+  contextKeepTurns: number;
+  shellEnabled: boolean;
+  shellAllowed: string[];
+  allowedDomains: string[];
+  version: string;
+}
+
 export type { AgentDefinition, WindowState, TokenUsage };

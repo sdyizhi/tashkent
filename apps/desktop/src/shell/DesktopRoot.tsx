@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { APP_REGISTRY, type AppDefinition } from '@tashkent/shared';
 import { useDesktopStore } from '../state/desktopStore.js';
 import { useDesktopEvents } from '../state/useDesktopEvents.js';
@@ -11,7 +11,32 @@ import Taskbar from './Taskbar.js';
 import StartMenu from './StartMenu.js';
 import ChatApp from '../apps/ChatApp.js';
 import FilesApp from '../apps/FilesApp.js';
+import NotesApp from '../apps/NotesApp.js';
+import BrowserApp from '../apps/BrowserApp.js';
+import TerminalApp from '../apps/TerminalApp.js';
 import AuthorizationDialog from '../components/AuthorizationDialog.js';
+
+/**
+ * 应用视图分发表。
+ *
+ * appId 与共享注册表（packages/shared/src/apps.ts）一一对应；
+ * 未登记的应用退回对话窗口，避免出现空白窗口。
+ */
+function renderAppView(appId: string, sessionId?: string): ReactNode {
+  switch (appId) {
+    case 'files':
+      return <FilesApp sessionId={sessionId} />;
+    case 'notes':
+      return <NotesApp sessionId={sessionId} />;
+    case 'browser':
+      return <BrowserApp sessionId={sessionId} />;
+    case 'terminal':
+      return <TerminalApp sessionId={sessionId} />;
+    case 'chat':
+    default:
+      return <ChatApp sessionId={sessionId} />;
+  }
+}
 
 export default function DesktopRoot() {
   const setApps = useDesktopStore((s) => s.setApps);
@@ -96,12 +121,7 @@ export default function DesktopRoot() {
     <div style={{ position: 'relative', height: '100%', overflow: 'hidden' }}>
       <Wallpaper />
       <DesktopIcons />
-      <WindowLayer
-        renderApp={(appId, sessionId) => {
-          if (appId === 'files') return <FilesApp sessionId={sessionId} />;
-          return <ChatApp sessionId={sessionId} />;
-        }}
-      />
+      <WindowLayer renderApp={(appId, sessionId) => renderAppView(appId, sessionId)} />
       <StartMenu />
       <Taskbar />
       <div className="xp-notifications" data-testid="desktop-notifications">
