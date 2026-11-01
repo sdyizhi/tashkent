@@ -4,47 +4,46 @@ import { agentRoutes } from './routes/agents.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { toolRoutes } from './routes/tools.js';
 import { eventRoutes } from './routes/events.js';
-import type { DB } from './db/index.js';
-import type { MessageRepository } from './db/repositories/messages.js';
-import type { SessionRepository } from './db/repositories/sessions.js';
-import type { AgentRegistry } from './agent/registry.js';
-import type { ToolRegistry } from './agent/tool-registry.js';
-import type { EventBus } from './lib/event-bus.js';
+import { desktopRoutes } from './routes/desktop.js';
+import type { Runtime } from './runtime.js';
 
-export interface AppDeps {
-  db: DB;
-  sessions: SessionRepository;
-  messages: MessageRepository;
-  agents: AgentRegistry;
-  tools: ToolRegistry;
-  bus: EventBus;
-  checkLlm: () => Promise<{ ok: boolean; latencyMs: number | null } | boolean>;
-  /** 发送消息后异步执行 agent */
-  dispatch: (sessionId: string, text: string) => Promise<void>;
-}
-
-export function createApp(deps: AppDeps) {
+export function createApp(rt: Runtime) {
   const app = new Hono();
+
   app.route(
     '/',
     healthRoutes({
-      db: deps.db,
-      sessions: deps.sessions,
-      agentCount: deps.agents.list().length,
-      checkLlm: deps.checkLlm,
+      db: rt.db,
+      sessions: rt.sessions,
+      agentCount: rt.registry.list().length,
+      checkLlm: async () => ({ ok: rt.provider !== undefined, latencyMs: null }),
     }),
   );
-  app.route('/', agentRoutes(deps.agents));
-  app.route('/', toolRoutes(deps.tools));
-  app.route('/', eventRoutes(deps.bus));
+  app.route('/', agentRoutes(rt.registry));
+  app.route('/', toolRoutes(rt.toolRegistry));
+  app.route('/', eventRoutes(rt.bus));
   app.route(
     '/',
     sessionRoutes({
-      sessions: deps.sessions,
-      messages: deps.messages,
-      dispatch: deps.dispatch,
+      sessions: rt.sessions,
+      messages: rt.messages,
+      dispatch: async (sessionId, text) => {
+        const session = rt.sessions.get(sessionId);
+        if (!session) return;
+        const agent = rt.registry.get(session.agentId);
+        if (!agent) return;
+        const result = await rt.runner.run({ sessionId, agentId: agent.id, agent, userText: text });
+        rt.messages.append({
+          sessionId,
+          role: 'assistant',
+          content: result.text,
+          toolCalls: result.toolCalls,
+        });
+      },
     }),
   );
+  app.route('/', desktopRoutes(rt.windowService));
+
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: '资源不存在' } }, 404));
   app.onError((err, c) => {
     return c.json({ error: { code: 'INTERNAL', message: err.message } }, 500);

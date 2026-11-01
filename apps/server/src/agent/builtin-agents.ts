@@ -2,8 +2,8 @@ import type { AgentDefinition } from '@tashkent/shared';
 
 /**
  * 内置 Agent 定义。
- * toolIds 只列出当前阶段（M2）已实现并注册的工具；
- * 桌面控制与 http/shell 工具在对应里程碑落地后再补进来。
+ * toolIds 只列出已实现并注册的工具；
+ * http / shell 为 dangerous 权限，实际执行仍由服务端 ToolExecutor 强制校验授权。
  */
 export const BUILTIN_AGENTS: AgentDefinition[] = [
   {
@@ -12,7 +12,19 @@ export const BUILTIN_AGENTS: AgentDefinition[] = [
     icon: '💬',
     description: '通用对话助手',
     systemPrompt: '你是一个运行在 WinXP 风格工作台中的助手。回答简洁、务实。',
-    toolIds: ['datetime.now', 'calc.eval', 'fs.read', 'fs.list', 'fs.write'],
+    toolIds: [
+      'datetime.now',
+      'calc.eval',
+      'fs.read',
+      'fs.list',
+      'fs.write',
+      'desktop.open_app',
+      'desktop.close_window',
+      'desktop.notify',
+      'http.get',
+      'http.post',
+      'shell.exec',
+    ],
     maxSteps: 8,
   },
   {

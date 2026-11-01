@@ -7,29 +7,7 @@ import { logger } from './lib/logger.js';
 
 const db = createDatabase(config.dbFile);
 const runtime = createRuntime({ db, config });
-
-const app = createApp({
-  db,
-  sessions: runtime.sessions,
-  messages: runtime.messages,
-  agents: runtime.registry,
-  tools: runtime.toolRegistry,
-  bus: runtime.bus,
-  checkLlm: async () => ({ ok: runtime.provider !== undefined, latencyMs: null }),
-  dispatch: async (sessionId, text) => {
-    const session = runtime.sessions.get(sessionId);
-    if (!session) return;
-    const agent = runtime.registry.get(session.agentId);
-    if (!agent) return;
-    const result = await runtime.runner.run({ sessionId, agentId: agent.id, agent, userText: text });
-    runtime.messages.append({
-      sessionId,
-      role: 'assistant',
-      content: result.text,
-      toolCalls: result.toolCalls,
-    });
-  },
-});
+const app = createApp(runtime);
 
 const server = serve(
   { fetch: app.fetch, port: config.port, hostname: config.host },

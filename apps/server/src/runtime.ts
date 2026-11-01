@@ -7,14 +7,19 @@ import { ToolRegistry } from './agent/tool-registry.js';
 import { ToolExecutor } from './agent/tool-executor.js';
 import { AgentRunner } from './agent/runner.js';
 import { createOpenAIProvider } from './agent/providers/openai.js';
+import { WindowService } from './services/window-service.js';
 import { AuthzService } from './services/authz-service.js';
 import { createFsTools } from './tools/fs.js';
 import { createDateTimeTools } from './tools/datetime.js';
 import { createCalcTools } from './tools/calc.js';
+import { createHttpTools } from './tools/http.js';
+import { createShellTools } from './tools/shell.js';
+import { createDesktopTools } from './tools/desktop.js';
 import { BUILTIN_AGENTS } from './agent/builtin-agents.js';
 import type { DB } from './db/index.js';
 import { MessageRepository } from './db/repositories/messages.js';
 import { SessionRepository } from './db/repositories/sessions.js';
+import { DesktopStateRepository } from './db/repositories/desktop-state.js';
 
 export interface RuntimeDeps {
   db: DB;
@@ -30,9 +35,21 @@ export function createRuntime(deps: RuntimeDeps) {
   registry.loadFromDir(path.join(path.dirname(config.dbFile), 'agents'));
 
   const toolRegistry = new ToolRegistry();
+  const windowService = new WindowService({
+    apps: [
+      { appId: 'chat', title: '对话', icon: '💬' },
+      { appId: 'files', title: '我的文档', icon: '📁', width: 520, height: 400 },
+    ],
+    defaultWidth: 640,
+    defaultHeight: 480,
+  });
+
   toolRegistry.registerAll(createFsTools(path.resolve(config.workspaceDir)));
   toolRegistry.registerAll(createDateTimeTools());
   toolRegistry.registerAll(createCalcTools());
+  toolRegistry.registerAll(createHttpTools(config.allowedDomains));
+  toolRegistry.registerAll(createShellTools({ enabled: config.shellEnabled, allowed: config.shellAllowed }));
+  toolRegistry.registerAll(createDesktopTools(windowService));
 
   const authz = new AuthzService();
   const executor = new ToolExecutor(toolRegistry, {
@@ -66,9 +83,11 @@ export function createRuntime(deps: RuntimeDeps) {
     executor,
     provider,
     runner,
+    windowService,
     authz,
     messages,
     sessions,
+    desktopState: new DesktopStateRepository(deps.db),
   };
 }
 
