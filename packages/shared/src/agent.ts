@@ -1,4 +1,4 @@
-import type { WindowState } from './window.js';
+import type { WindowState } from './window.ts';
 
 export interface AgentDefinition {
   id: string;

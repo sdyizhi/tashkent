@@ -1,4 +1,4 @@
-import type { AgentEvent } from './agent.js';
+import type { AgentEvent } from './agent.ts';
 
 export type ToolPermission = 'safe' | 'write' | 'dangerous';
 

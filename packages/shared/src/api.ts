@@ -1,5 +1,5 @@
-import type { AgentDefinition, TokenUsage } from './agent.js';
-import type { WindowState } from './window.js';
+import type { AgentDefinition, TokenUsage } from './agent.ts';
+import type { WindowState } from './window.ts';
 
 export interface ApiError {
   error: { code: string; message: string; details?: Record<string, unknown> };
