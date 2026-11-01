@@ -42,7 +42,7 @@ export function createApp(rt: Runtime) {
       },
     }),
   );
-  app.route('/', desktopRoutes(rt.windowService));
+  app.route('/', desktopRoutes(rt.windowService, (event) => rt.bus.publish(event)));
 
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: '资源不存在' } }, 404));
   app.onError((err, c) => {

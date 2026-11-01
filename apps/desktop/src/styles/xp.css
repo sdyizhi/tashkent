@@ -222,3 +222,125 @@ body {
   font-size: 20px;
   line-height: 1;
 }
+
+/* ---- 授权确认对话框 ---- */
+
+.xp-modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10003;
+}
+
+.xp-dialog {
+  width: 360px;
+  background: var(--xp-face);
+  border: 2px solid var(--xp-blue-start);
+  box-shadow: var(--xp-shadow-hard);
+  display: flex;
+  flex-direction: column;
+}
+
+.xp-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  background: linear-gradient(180deg, var(--xp-blue-start) 0%, var(--xp-blue-end) 100%);
+  color: #fff;
+  font-weight: bold;
+}
+
+.xp-dialog-icon { font-size: 14px; }
+
+.xp-dialog-body {
+  padding: 10px 12px;
+  background: var(--xp-face-light);
+  border: 1px solid var(--xp-border-out);
+  margin: 3px;
+  font-size: var(--xp-font-size);
+  line-height: 1.5;
+}
+
+.xp-dialog-message { margin-bottom: 8px; }
+
+.xp-dialog-detail { margin-bottom: 6px; }
+
+.xp-dialog-args {
+  margin: 0 0 8px;
+  padding: 4px 6px;
+  max-height: 110px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #7a7a7a;
+  font-family: "Courier New", monospace;
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.xp-dialog-remember {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.xp-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 3px 3px;
+}
+
+.xp-dialog-btn {
+  min-width: 72px;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 3px;
+  border: 1px solid var(--xp-border-out);
+  background: linear-gradient(180deg, #ffffff 0%, var(--xp-face) 100%);
+  color: var(--xp-text);
+  font-family: var(--xp-font);
+  font-size: var(--xp-font-size);
+  cursor: pointer;
+}
+
+.xp-dialog-btn:hover { filter: brightness(1.05); }
+.xp-dialog-btn:active { filter: brightness(0.92); }
+
+.xp-dialog-btn.default {
+  background: linear-gradient(180deg, #4a90d9 0%, var(--xp-blue-start) 100%);
+  color: #fff;
+  font-weight: bold;
+}
+
+/* ---- 桌面通知气泡 ---- */
+
+.xp-notifications {
+  position: fixed;
+  right: 8px;
+  bottom: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10002;
+}
+
+.xp-notification {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 6px 9px;
+  background: var(--xp-face-light);
+  border: 1px solid var(--xp-border-out);
+  box-shadow: var(--xp-shadow-hard);
+  font-size: var(--xp-font-size);
+  cursor: pointer;
+}
+
+.xp-notification-icon { font-size: 16px; }

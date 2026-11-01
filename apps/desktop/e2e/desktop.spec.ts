@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 test.describe('桌面外壳交互', () => {
   test('显示壁纸、任务栏与桌面图标', async ({ page }) => {
