@@ -147,7 +147,9 @@ export class AgentRunner {
             };
             break;
           case 'finish':
-            if (chunk.reason === 'error' && !error) error = '模型返回错误';
+            if (chunk.reason === 'error' && !error) {
+              error = chunk.message ?? '模型返回错误';
+            }
             break;
         }
       }

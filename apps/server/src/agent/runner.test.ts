@@ -130,4 +130,22 @@ describe('AgentRunner', () => {
     await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
     expect(events.length).toBeGreaterThan(0);
   });
+
+  it('模型返回 error 时把底层错误信息透传到 run_error', async () => {
+    const provider = scriptedProvider([
+      [{ type: 'finish', reason: 'error', message: '连接超时' }],
+    ]);
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+    });
+
+    const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+    expect(result.error).toBe('连接超时');
+    const errEvent = result.events.find((e) => e.type === 'run_error');
+    expect(errEvent && errEvent.type === 'run_error' && errEvent.message).toBe('连接超时');
+  });
 });

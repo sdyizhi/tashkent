@@ -1,17 +1,34 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { createDatabase } from './db/index.js';
-import { SessionRepository } from './db/repositories/sessions.js';
+import { createRuntime } from './runtime.js';
 import { config } from './lib/config.js';
 import { logger } from './lib/logger.js';
 
 const db = createDatabase(config.dbFile);
-const sessions = new SessionRepository(db);
+const runtime = createRuntime({ db, config });
 
 const app = createApp({
   db,
-  sessions,
-  checkLlm: async () => ({ ok: false, latencyMs: null }),
+  sessions: runtime.sessions,
+  messages: runtime.messages,
+  agents: runtime.registry,
+  tools: runtime.toolRegistry,
+  bus: runtime.bus,
+  checkLlm: async () => ({ ok: runtime.provider !== undefined, latencyMs: null }),
+  dispatch: async (sessionId, text) => {
+    const session = runtime.sessions.get(sessionId);
+    if (!session) return;
+    const agent = runtime.registry.get(session.agentId);
+    if (!agent) return;
+    const result = await runtime.runner.run({ sessionId, agentId: agent.id, agent, userText: text });
+    runtime.messages.append({
+      sessionId,
+      role: 'assistant',
+      content: result.text,
+      toolCalls: result.toolCalls,
+    });
+  },
 });
 
 const server = serve(
@@ -22,6 +39,8 @@ const server = serve(
       host: config.host,
       model: config.model,
       apiKeyPresent: config.apiKey.length > 0,
+      agents: runtime.registry.list().length,
+      tools: runtime.toolRegistry.list().length,
     });
   },
 );

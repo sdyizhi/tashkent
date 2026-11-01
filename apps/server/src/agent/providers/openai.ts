@@ -14,6 +14,23 @@ export interface OpenAIProviderOptions {
   baseUrl?: string;
 }
 
+/** 从 SDK 抛出的错误对象里抽出可读信息 */
+function errorMessage(err: unknown): string | undefined {
+  if (!err) return undefined;
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) {
+    // SDK 的错误 toString() 会附带 Symbol(vercel.ai.error) 等噪音行，去掉
+    const msg = err.message
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('Symbol(vercel.ai.error'))
+      .join('\n')
+      .trim();
+    return msg || err.name;
+  }
+  const anyErr = err as { message?: unknown };
+  return typeof anyErr.message === 'string' ? anyErr.message : undefined;
+}
+
 export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
   const openai = createOpenAI({
     apiKey: opts.apiKey,
@@ -90,7 +107,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
             break;
           }
           case 'error':
-            yield { type: 'finish', reason: 'error' };
+            yield { type: 'finish', reason: 'error', message: errorMessage(part.error) };
             break;
           default:
             break;

@@ -30,7 +30,8 @@ export type LLMChunk =
   | { type: 'tool-call'; toolCallId: string; toolName: string; args: unknown }
   | { type: 'tool-result'; toolCallId: string; toolName: string; result: unknown }
   | { type: 'usage'; inputTokens: number; outputTokens: number; totalTokens: number }
-  | { type: 'finish'; reason: string };
+  /** reason 为 'error' 时，message 携带底层错误详情（连接失败、鉴权失败等） */
+  | { type: 'finish'; reason: string; message?: string };
 
 export interface LLMProvider {
   stream(req: LLMRequest): AsyncIterable<LLMChunk>;
