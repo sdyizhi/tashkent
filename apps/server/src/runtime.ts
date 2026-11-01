@@ -7,6 +7,7 @@ import { ToolRegistry } from './agent/tool-registry.js';
 import { ToolExecutor } from './agent/tool-executor.js';
 import { AgentRunner } from './agent/runner.js';
 import { createOpenAIProvider } from './agent/providers/openai.js';
+import { createLlmHealthProbe } from './lib/llm-health.js';
 import { WindowService } from './services/window-service.js';
 import { AuthzService } from './services/authz-service.js';
 import { createFsTools } from './tools/fs.js';
@@ -73,7 +74,20 @@ export function createRuntime(deps: RuntimeDeps) {
     },
   });
 
-  const provider = createOpenAIProvider({ apiKey: config.apiKey, baseUrl: config.baseUrl });
+  const provider = createOpenAIProvider({
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl,
+    probeModel: config.model,
+  });
+
+  // 健康检查用的 LLM 探测：没密钥直接判失败；有密钥则做带超时的轻量真实探测并缓存结果
+  const checkLlm = createLlmHealthProbe({
+    apiKey: config.apiKey,
+    probe: async () => {
+      if (!provider.probe) throw new Error('provider 不支持探测');
+      await provider.probe();
+    },
+  });
 
   const messages = new MessageRepository(deps.db);
   const sessions = new SessionRepository(deps.db);
@@ -100,6 +114,7 @@ export function createRuntime(deps: RuntimeDeps) {
     toolRegistry,
     executor,
     provider,
+    checkLlm,
     runner,
     windowService,
     authz,

@@ -37,4 +37,11 @@ export type LLMChunk =
 
 export interface LLMProvider {
   stream(req: LLMRequest): AsyncIterable<LLMChunk>;
+  /**
+   * 轻量可达性探测：成功 resolve 表示模型服务可达，失败则抛错。
+   *
+   * 健康检查用它在「已配置密钥」的前提下判定真实可用性，
+   * 而不是看 provider 对象是否存在（那永远为真）。
+   */
+  probe?(): Promise<void>;
 }

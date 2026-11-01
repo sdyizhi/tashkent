@@ -9,6 +9,9 @@ import { describe, expect, it, vi } from 'vitest';
  */
 const captured: Record<string, unknown>[] = [];
 const stepCounts: number[] = [];
+const generateCalls: Record<string, unknown>[] = [];
+/** 让下一次 generateText 模拟失败 */
+let generateShouldFail = false;
 
 vi.mock('ai', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ai')>();
@@ -17,6 +20,13 @@ vi.mock('ai', async (importOriginal) => {
     stepCountIs: (n: number) => {
       stepCounts.push(n);
       return actual.stepCountIs(n);
+    },
+    generateText: (args: Record<string, unknown>) => {
+      generateCalls.push(args);
+      if (generateShouldFail) {
+        return Promise.reject(new Error('鉴权失败'));
+      }
+      return Promise.resolve({ text: 'pong' });
     },
     streamText: (args: Record<string, unknown>) => {
       captured.push(args);
@@ -63,5 +73,26 @@ describe('OpenAI provider 步数上限', () => {
     }
     expect(captured).toHaveLength(1);
     expect(stepCounts).toEqual([3]);
+  });
+});
+
+describe('OpenAI provider 可达性探测', () => {
+  it('probe 发一次最小请求', async () => {
+    generateCalls.length = 0;
+    const provider = createOpenAIProvider({ apiKey: 'sk-test', probeModel: 'gpt-4o-mini' });
+    await provider.probe!();
+    expect(generateCalls).toHaveLength(1);
+    expect(generateCalls[0]?.prompt).toBe('ping');
+    expect(generateCalls[0]?.maxOutputTokens).toBe(1);
+  });
+
+  it('probe 失败时抛出错误', async () => {
+    generateShouldFail = true;
+    try {
+      const failing = createOpenAIProvider({ apiKey: 'sk-test' });
+      await expect(failing.probe!()).rejects.toBeTruthy();
+    } finally {
+      generateShouldFail = false;
+    }
   });
 });

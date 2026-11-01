@@ -18,7 +18,7 @@ export function createApp(rt: Runtime) {
       db: rt.db,
       sessions: rt.sessions,
       agentCount: rt.registry.list().length,
-      checkLlm: async () => ({ ok: rt.provider !== undefined, latencyMs: null }),
+      checkLlm: rt.checkLlm,
     }),
   );
   app.route('/', agentRoutes(rt.registry));

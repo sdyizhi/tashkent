@@ -1,5 +1,6 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import {
+  generateText,
   streamText,
   stepCountIs,
   tool as aiTool,
@@ -12,6 +13,8 @@ import type { LLMChunk, LLMProvider, LLMRequest } from '../provider.js';
 export interface OpenAIProviderOptions {
   apiKey: string;
   baseUrl?: string;
+  /** 探测用的模型 id，缺省用 gpt-4o-mini */
+  probeModel?: string;
 }
 
 /** 从 SDK 抛出的错误对象里抽出可读信息 */
@@ -38,6 +41,20 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
   });
 
   return {
+    /**
+     * 轻量可达性探测：发一次最小的 chat 请求（1 token 上限）。
+     *
+     * 用来在健康检查里判定「模型服务真的能连上」，
+     * 失败时抛错，由调用方降级为 degraded。
+     */
+    async probe(): Promise<void> {
+      await generateText({
+        model: openai(opts.probeModel ?? 'gpt-4o-mini'),
+        prompt: 'ping',
+        maxOutputTokens: 1,
+      });
+    },
+
     async *stream(req: LLMRequest): AsyncIterable<LLMChunk> {
       const model = openai(req.model);
 
