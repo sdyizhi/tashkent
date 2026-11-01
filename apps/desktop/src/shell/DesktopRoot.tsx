@@ -98,7 +98,7 @@ export default function DesktopRoot() {
       <DesktopIcons />
       <WindowLayer
         renderApp={(appId, sessionId) => {
-          if (appId === 'files') return <FilesApp />;
+          if (appId === 'files') return <FilesApp sessionId={sessionId} />;
           return <ChatApp sessionId={sessionId} />;
         }}
       />

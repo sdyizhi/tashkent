@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { AgentEvent, WindowState } from '@tashkent/shared';
 import { WindowService } from '../services/window-service.js';
 import { DESKTOP_SESSION_ID, desktopRoutes } from './desktop.js';
@@ -7,6 +10,8 @@ import { DESKTOP_SESSION_ID, desktopRoutes } from './desktop.js';
 let svc: WindowService;
 let events: AgentEvent[];
 let app: Hono;
+/** 文件浏览端点使用的工作区沙箱根目录 */
+let workspaceDir: string;
 
 beforeEach(() => {
   svc = new WindowService({
@@ -18,8 +23,9 @@ beforeEach(() => {
     defaultHeight: 480,
   });
   events = [];
+  workspaceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tashkent-files-'));
   app = new Hono();
-  app.route('/', desktopRoutes(svc, (e) => events.push(e)));
+  app.route('/', desktopRoutes(svc, (e) => events.push(e), workspaceDir));
 });
 
 /** 调用打开窗口接口，返回状态码与窗口载荷 */
@@ -216,5 +222,115 @@ describe('DELETE /api/desktop/windows/:id', () => {
     const res = await app.request('/api/desktop/windows/ghost', { method: 'DELETE' });
     expect(res.status).toBe(404);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('GET /api/files（我的文档的真实文件浏览）', () => {
+  it('列出工作区根目录下的条目，文件带字节数', async () => {
+    fs.writeFileSync(path.join(workspaceDir, 'a.txt'), 'hello');
+    fs.mkdirSync(path.join(workspaceDir, 'sub'));
+
+    const res = await app.request('/api/files');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      path: string;
+      entries: Array<{ name: string; type: string; size: number }>;
+    };
+    expect(body.path).toBe('.');
+    const names = body.entries.map((e) => e.name).sort();
+    expect(names).toEqual(['a.txt', 'sub']);
+    const file = body.entries.find((e) => e.name === 'a.txt');
+    expect(file?.type).toBe('file');
+    expect(file?.size).toBe(5);
+    expect(body.entries.find((e) => e.name === 'sub')?.type).toBe('dir');
+  });
+
+  it('按 path 列出子目录', async () => {
+    fs.mkdirSync(path.join(workspaceDir, 'sub'));
+    fs.writeFileSync(path.join(workspaceDir, 'sub', 'b.txt'), 'x');
+
+    const res = await app.request('/api/files?path=sub');
+    const body = (await res.json()) as { entries: Array<{ name: string }> };
+    expect(body.entries.map((e) => e.name)).toEqual(['b.txt']);
+  });
+
+  it('路径逃逸出沙箱时返回 400', async () => {
+    const res = await app.request('/api/files?path=../');
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe('READ_FAILED');
+  });
+
+  it('读取不存在的目录返回 400', async () => {
+    const res = await app.request('/api/files?path=ghost');
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('PUT /api/files（记事本保存）', () => {
+  it('写入文本文件并可读回', async () => {
+    const res = await app.request('/api/files', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'note.txt', content: '你好' }),
+    });
+    expect(res.status).toBe(200);
+    expect(fs.readFileSync(path.join(workspaceDir, 'note.txt'), 'utf-8')).toBe('你好');
+  });
+
+  it('自动创建缺失的父目录', async () => {
+    await app.request('/api/files', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'deep/dir/note.txt', content: 'x' }),
+    });
+    expect(fs.existsSync(path.join(workspaceDir, 'deep', 'dir', 'note.txt'))).toBe(true);
+  });
+
+  it('路径逃逸出沙箱时拒绝写入', async () => {
+    const res = await app.request('/api/files', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '../escape.txt', content: 'x' }),
+    });
+    expect(res.status).toBe(400);
+    expect(fs.existsSync(path.join(path.dirname(workspaceDir), 'escape.txt'))).toBe(false);
+  });
+
+  it('缺少 path 或 content 返回 400', async () => {
+    const noPath = await app.request('/api/files', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: 'x' }),
+    });
+    expect(noPath.status).toBe(400);
+
+    const noContent = await app.request('/api/files', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: 'a.txt' }),
+    });
+    expect(noContent.status).toBe(400);
+  });
+});
+
+describe('GET /api/files/:path（读取单个文本文件）', () => {
+  it('返回文件内容', async () => {
+    fs.writeFileSync(path.join(workspaceDir, 'a.txt'), '内容');
+    const res = await app.request('/api/files/a.txt');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { path: string; content: string };
+    expect(body.path).toBe('a.txt');
+    expect(body.content).toBe('内容');
+  });
+
+  it('路径逃逸出沙箱时返回 400', async () => {
+    const res = await app.request('/api/files/..%2Fsecret.txt');
+    expect(res.status).toBe(400);
+  });
+
+  it('读取不存在的文件返回 400', async () => {
+    const res = await app.request('/api/files/ghost.txt');
+    expect(res.status).toBe(400);
   });
 });

@@ -156,6 +156,8 @@ export function createRuntime(deps: RuntimeDeps) {
     messages,
     sessions,
     desktopState,
+    /** 工作区根目录（文件浏览 / 写入的沙箱边界） */
+    workspaceDir: path.resolve(config.workspaceDir),
   };
 }
 

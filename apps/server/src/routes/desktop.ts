@@ -1,6 +1,9 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { Hono } from 'hono';
 import type { AgentEvent, WindowsResponse } from '@tashkent/shared';
 import type { WindowService } from '../services/window-service.js';
+import { resolveInSandbox } from '../tools/fs.js';
 
 /**
  * 桌面窗口命令不是会话内的行为，因此用固定 sessionId 标记。
@@ -10,7 +13,7 @@ export const DESKTOP_SESSION_ID = '__desktop__';
 
 export type DesktopEventSink = (event: AgentEvent) => void;
 
-export function desktopRoutes(svc: WindowService, emit: DesktopEventSink) {
+export function desktopRoutes(svc: WindowService, emit: DesktopEventSink, workspaceDir: string) {
   const app = new Hono();
 
   app.get('/api/desktop/windows', (c) => {
@@ -72,6 +75,68 @@ export function desktopRoutes(svc: WindowService, emit: DesktopEventSink) {
       windowId: id,
     });
     return c.json({ ok: true });
+  });
+
+  /**
+   * 浏览工作区目录（我的文档应用）。
+   *
+   * 路径经 resolveInSandbox 校验，逃出工作区根目录的路径一律拒绝。
+   */
+  app.get('/api/files', (c) => {
+    const rel = c.req.query('path') ?? '.';
+    try {
+      const abs = resolveInSandbox(workspaceDir, rel === '' ? '.' : rel);
+      const entries = fs.readdirSync(abs, { withFileTypes: true }).map((e) => ({
+        name: e.name,
+        type: e.isDirectory() ? ('dir' as const) : ('file' as const),
+        size: e.isFile() ? fs.statSync(path.join(abs, e.name)).size : 0,
+      }));
+      return c.json({ path: rel, entries });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: { code: 'READ_FAILED', message } }, 400);
+    }
+  });
+
+  /**
+   * 读取工作区内的单个文本文件（记事本应用）。
+   *
+   * 与目录浏览共用沙箱校验，避免读到工作区之外的文件。
+   */
+  app.get('/api/files/:path', (c) => {
+    const rel = c.req.param('path');
+    try {
+      const abs = resolveInSandbox(workspaceDir, rel);
+      const content = fs.readFileSync(abs, 'utf-8');
+      return c.json({ path: rel, content });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: { code: 'READ_FAILED', message } }, 400);
+    }
+  });
+
+  /**
+   * 写入工作区内的文本文件（记事本应用保存）。
+   *
+   * 写入前同样经沙箱校验；缺失的父目录会被自动创建。
+   */
+  app.put('/api/files', async (c) => {
+    const body = (await c.req.json()) as { path?: string; content?: string };
+    if (!body || typeof body.path !== 'string' || body.path === '') {
+      return c.json({ error: { code: 'BAD_REQUEST', message: 'path 必填' } }, 400);
+    }
+    if (typeof body.content !== 'string') {
+      return c.json({ error: { code: 'BAD_REQUEST', message: 'content 必填' } }, 400);
+    }
+    try {
+      const abs = resolveInSandbox(workspaceDir, body.path);
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, body.content, 'utf-8');
+      return c.json({ ok: true, path: body.path });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: { code: 'WRITE_FAILED', message } }, 400);
+    }
   });
 
   return app;

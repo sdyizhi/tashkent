@@ -455,3 +455,48 @@ body {
 }
 
 .xp-notification-icon { font-size: 16px; }
+
+/* ---- 应用视图通用（工具栏 / 列表 / 状态栏） ---- */
+
+.xp-files {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.xp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-bottom: 1px solid #aca899;
+  background: var(--xp-face);
+}
+
+.xp-path { font-size: 11px; color: #333; }
+
+.xp-file-list { flex: 1; overflow: auto; padding: 2px; }
+
+.xp-file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  cursor: default;
+}
+
+.xp-file-item:hover { background: #316ac5; color: #fff; }
+.xp-file-icon { width: 18px; text-align: center; }
+.xp-file-size { margin-left: auto; color: #777; font-size: 10px; }
+.xp-file-item:hover .xp-file-size { color: #e0e0e0; }
+
+.xp-list-hint { padding: 8px; color: #777; }
+.xp-list-hint.error { color: #c0392b; }
+
+.xp-statusbar {
+  border-top: 1px solid #aca899;
+  padding: 2px 4px;
+  font-size: 10px;
+  color: #555;
+  background: var(--xp-face);
+}

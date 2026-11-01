@@ -45,7 +45,7 @@ export function createApp(rt: Runtime) {
       },
     }),
   );
-  app.route('/', desktopRoutes(rt.windowService, (event) => rt.bus.publish(event)));
+  app.route('/', desktopRoutes(rt.windowService, (event) => rt.bus.publish(event), rt.workspaceDir));
   app.route('/', desktopStateRoutes(rt.desktopState));
   app.route('/', appRoutes());
 

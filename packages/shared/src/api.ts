@@ -51,4 +51,21 @@ export interface ToolsResponse {
   tools: Array<{ name: string; description: string; permission: string }>;
 }
 
+/** 工作区目录条目 */
+export interface FileEntry {
+  name: string;
+  type: 'dir' | 'file';
+  size: number;
+}
+
+export interface FileListResponse {
+  path: string;
+  entries: FileEntry[];
+}
+
+export interface FileContentResponse {
+  path: string;
+  content: string;
+}
+
 export type { AgentDefinition, WindowState, TokenUsage };
