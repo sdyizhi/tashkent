@@ -1,0 +1,18 @@
+:root {
+  --xp-blue-start: #245edb;
+  --xp-blue-end: #3a8aeb;
+  --xp-blue-inactive-start: #7b9ad1;
+  --xp-blue-inactive-end: #b5c7e7;
+  --xp-close-start: #e8837c;
+  --xp-close-end: #e0554b;
+  --xp-taskbar: #245edb;
+  --xp-taskbar-edge: #1941a5;
+  --xp-face: #ece9d8;
+  --xp-face-light: #f6f4ec;
+  --xp-shadow-hard: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  --xp-border-out: #003c74;
+  --xp-border-in: #ffffff;
+  --xp-text: #000000;
+  --xp-font: "Tahoma", "Microsoft Sans Serif", sans-serif;
+  --xp-font-size: 11px;
+}
