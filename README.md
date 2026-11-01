@@ -13,7 +13,7 @@ docker compose up -d
 
 打开 http://localhost:8080 —— 后端在所有 `/api` 路由之后托管 `apps/desktop/dist`，根路径直接返回 XP 桌面。
 
-未配置 `LLM_API_KEY` 时服务仍可启动，界面正常渲染，仅对话不可用（`/api/health` 返回 `degraded`）。
+未配置 `LLM_API_KEY` 时服务仍可启动，界面正常渲染，仅对话不可用（`/api/health` 返回 `degraded`）。配置了密钥时，健康检查会做一次带 3 秒超时的轻量真实探测（结果缓存 30 秒），探测失败同样返回 `degraded`。
 
 ## 本地开发
 
@@ -34,7 +34,7 @@ pnpm --filter @tashkent/desktop test:e2e   # 端到端（需先起后端 :8080�
 powershell -ExecutionPolicy Bypass -File scripts\smoke.ps1   # 冒烟（需先起后端 :8080）
 ```
 
-当前测试规模：后端 **103** 个用例、前端 **62** 个单元用例、**14** 个 Playwright E2E 用例。
+当前测试规模：后端 **143** 个用例、前端 **73** 个单元用例、**15** 个 Playwright E2E 用例。
 
 ### 冒烟脚本
 
@@ -87,6 +87,10 @@ powershell -ExecutionPolicy Bypass -File scripts\smoke.ps1   # 冒烟（需先�
 | `LLM_API_KEY` | 空 | 模型服务密钥，填入才能对话 |
 | `LLM_BASE_URL` | 空 | 自定义模型端点（兼容 OpenAI 协议的服务） |
 | `LLM_MODEL` | `gpt-4o-mini` | 默认模型 id |
+| `MAX_STEPS` | `8` | 单次运行的工具调用轮数上限（agent 可用 `maxSteps` 覆盖） |
+| `MAX_INPUT_TOKENS` | `120000` | 上下文窗口预算（裁剪计算用，预留 25% 给输出） |
+| `CONTEXT_KEEP_TURNS` | `20` | 保留的最近完整对话轮数 |
+| `TOOL_RESULT_MAX_BYTES` | `8192` | 单个工具结果的截断阈值 |
 | `ALLOWED_DOMAINS` | 空 | `http.*` 工具的域名白名单，支持 `*.` 前缀 |
 | `SHELL_ENABLED` | `false` | `shell.exec` 总开关 |
 | `WORKSPACE_DIR` | `data/workspace` | Agent 可读写的沙箱根目录 |
