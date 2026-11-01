@@ -1,6 +1,6 @@
 ﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WindowState } from '@tashkent/shared';
-import { useDesktopStore } from './desktopStore.js';
+import { APP_REGISTRY, type WindowState } from '@tashkent/shared';
+import { iconsFromApps, useDesktopStore } from './desktopStore.js';
 
 function remoteWindow(id: string, overrides: Partial<WindowState> = {}): WindowState {
   return {
@@ -665,6 +665,92 @@ describe('desktopStore 窗口列表恢复（服务端权威源）', () => {
     await expect(useDesktopStore.getState().restoreWindows()).resolves.toBeUndefined();
 
     expect(useDesktopStore.getState().windows).toHaveLength(1);
+
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('desktopStore 应用注册表驱动桌面', () => {
+  beforeEach(() => {
+    useDesktopStore.setState({
+      windows: [],
+      icons: [],
+      restoredIcons: [],
+      focusedId: null,
+      nextZIndex: 10,
+      apps: APP_REGISTRY,
+    });
+    vi.restoreAllMocks();
+  });
+
+  it('默认应用列表来自共享注册表（七个应用）', () => {
+    expect(useDesktopStore.getState().apps).toHaveLength(7);
+    expect(useDesktopStore.getState().apps.map((a) => a.appId)).toContain('notes');
+  });
+
+  it('setApps 后桌面图标按注册表重建', () => {
+    useDesktopStore.getState().setApps([
+      { appId: 'a', title: 'A', icon: '🅰️', agentId: 'a', width: 1, height: 1, group: 'system', description: '' },
+      { appId: 'b', title: 'B', icon: '🅱️', agentId: 'b', width: 1, height: 1, group: 'system', description: '' },
+    ]);
+
+    const icons = useDesktopStore.getState().icons;
+    expect(icons.map((i) => i.appId)).toEqual(['a', 'b']);
+    expect(icons[0]?.title).toBe('A');
+    expect(icons[1]?.y).toBe(78);
+  });
+
+  it('setApps 保留已恢复的图标位置', () => {
+    useDesktopStore.setState({
+      restoredIcons: [{ appId: 'a', title: 'A', icon: '🅰️', x: 11, y: 22 }],
+    });
+    useDesktopStore.getState().setApps([
+      { appId: 'a', title: 'A', icon: '🅰️', agentId: 'a', width: 1, height: 1, group: 'system', description: '' },
+    ]);
+
+    const icon = useDesktopStore.getState().icons[0];
+    expect(icon?.x).toBe(11);
+    expect(icon?.y).toBe(22);
+  });
+
+  it('setApps 丢弃注册表中已删除的应用图标', () => {
+    useDesktopStore.getState().setApps(APP_REGISTRY);
+    useDesktopStore.getState().setApps(APP_REGISTRY.filter((a) => a.appId !== 'files'));
+
+    expect(useDesktopStore.getState().icons.map((i) => i.appId)).not.toContain('files');
+  });
+
+  it('iconsFromApps 对空恢复列表按顺序铺开', () => {
+    const icons = iconsFromApps(APP_REGISTRY);
+    expect(icons).toHaveLength(7);
+    expect(icons[0]?.appId).toBe('chat');
+    expect(icons[6]?.appId).toBe('tasks');
+    expect(icons[3]?.y).toBe(234);
+  });
+
+  it('restoreLayout 恢复的位置作为后续 setApps 的位置参考', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            key: 'desktop',
+            value: {
+              icons: [{ appId: 'chat', title: '对话', icon: '💬', x: 12, y: 34 }],
+              windows: [],
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().restoreLayout();
+    expect(useDesktopStore.getState().restoredIcons[0]?.x).toBe(12);
+
+    useDesktopStore.getState().setApps(APP_REGISTRY);
+    const chatIcon = useDesktopStore.getState().icons.find((i) => i.appId === 'chat');
+    expect(chatIcon?.x).toBe(12);
+    expect(chatIcon?.y).toBe(34);
 
     vi.unstubAllGlobals();
   });

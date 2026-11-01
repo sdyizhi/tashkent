@@ -169,6 +169,13 @@ body {
 
 .xp-menu-item:hover { background: var(--xp-blue-start); color: #fff; }
 
+.xp-menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  border: none;
+  background: linear-gradient(90deg, transparent, #aca899 20%, #aca899 80%, transparent);
+}
+
 .xp-menu-item[aria-disabled="true"] {
   color: #808080;
   cursor: default;

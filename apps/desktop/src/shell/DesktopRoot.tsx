@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { APP_REGISTRY, type AppDefinition } from '@tashkent/shared';
 import { useDesktopStore } from '../state/desktopStore.js';
 import { useDesktopEvents } from '../state/useDesktopEvents.js';
 import { useAuthorizationStore } from '../state/authorizationStore.js';
@@ -12,13 +13,8 @@ import ChatApp from '../apps/ChatApp.js';
 import FilesApp from '../apps/FilesApp.js';
 import AuthorizationDialog from '../components/AuthorizationDialog.js';
 
-const DEFAULT_ICONS = [
-  { appId: 'chat', title: '对话', icon: '💬', x: 0, y: 0 },
-  { appId: 'files', title: '我的文档', icon: '📁', x: 0, y: 0 },
-];
-
 export default function DesktopRoot() {
-  const setIcons = useDesktopStore((s) => s.setIcons);
+  const setApps = useDesktopStore((s) => s.setApps);
   const setStartMenuOpen = useDesktopStore((s) => s.setStartMenuOpen);
   const persist = useDesktopStore((s) => s.persist);
   const restoreLayout = useDesktopStore((s) => s.restoreLayout);
@@ -31,19 +27,32 @@ export default function DesktopRoot() {
   const authRequest = useAuthorizationStore((s) => s.request);
   const clearRequest = useAuthorizationStore((s) => s.clearRequest);
 
-  // 从服务端恢复桌面布局；服务端没有记录时用默认图标兜底
+  // 从服务端取应用注册表 → 恢复旧布局 → 按注册表派生桌面图标。
+  // 注册表以服务端为准，离线时回退到共享常量，桌面依然可用。
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      let list = APP_REGISTRY;
+      try {
+        const res = await fetch('/api/apps');
+        if (res.ok) {
+          const body = (await res.json()) as { apps: AppDefinition[] };
+          if (body.apps.length > 0) list = body.apps;
+        }
+      } catch {
+        // 离线时用共享常量兜底
+      }
+      if (cancelled) return;
+      setApps(list);
       await restoreLayout();
       if (cancelled) return;
-      const restored = useDesktopStore.getState().icons;
-      if (restored.length === 0) setIcons(DEFAULT_ICONS);
+      // restoreLayout 写回的是旧布局里的图标，这里按注册表重新派生一次
+      setApps(list);
     })();
     return () => {
       cancelled = true;
     };
-  }, [restoreLayout, setIcons]);
+  }, [restoreLayout, setApps]);
 
   // 桌面状态变化后持久化到服务端（去抖，避免拖拽时高频写入）
   useEffect(() => {

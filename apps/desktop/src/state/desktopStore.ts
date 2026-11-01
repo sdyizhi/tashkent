@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WindowState, WindowsResponse } from '@tashkent/shared';
+import { APP_REGISTRY, type AppDefinition, type WindowState, type WindowsResponse } from '@tashkent/shared';
 import {
   closeWindow,
   createWindow,
@@ -9,7 +9,6 @@ import {
   moveWindow,
   resizeWindow,
   restoreWindow,
-  type AppMeta,
 } from '../windows/windowMachine.js';
 
 export interface DesktopIcon {
@@ -18,6 +17,26 @@ export interface DesktopIcon {
   icon: string;
   x: number;
   y: number;
+}
+
+/**
+ * 由应用注册表派生桌面图标布局。
+ *
+ * 注册表是唯一来源：已恢复的旧布局只保留位置，
+ * 注册表里新增的应用补到末尾，注册表里删掉的应用不再出现。
+ */
+export function iconsFromApps(apps: AppDefinition[], restored: DesktopIcon[] = []): DesktopIcon[] {
+  const byApp = new Map(restored.map((i) => [i.appId, i]));
+  return apps.map((a, i) => {
+    const old = byApp.get(a.appId);
+    return {
+      appId: a.appId,
+      title: a.title,
+      icon: a.icon,
+      x: old?.x ?? 0,
+      y: old?.y ?? i * 78,
+    };
+  });
 }
 
 export interface PersistedWindow {
@@ -37,10 +56,13 @@ export interface DesktopPersisted {
 interface DesktopStore {
   windows: WindowState[];
   icons: DesktopIcon[];
+  /** 从服务端恢复的旧图标布局，仅用于给新应用提供位置参考 */
+  restoredIcons: DesktopIcon[];
   focusedId: string | null;
   startMenuOpen: boolean;
   nextZIndex: number;
-  apps: AppMeta[];
+  /** 桌面应用注册表（来自服务端 /api/apps） */
+  apps: AppDefinition[];
 
   openApp: (appId: string, params?: Record<string, unknown>) => Promise<string | null>;
   close: (id: string) => Promise<void>;
@@ -52,6 +74,8 @@ interface DesktopStore {
   focus: (id: string) => void;
   setStartMenuOpen: (open: boolean) => void;
   setIcons: (icons: DesktopIcon[]) => void;
+  /** 用服务端下发的应用注册表覆盖本地应用列表 */
+  setApps: (apps: AppDefinition[]) => void;
   applyRemoteWindows: (windows: WindowState[]) => void;
   /** 用服务端广播的完整窗口载荷新增或替换窗口 */
   upsertRemoteWindow: (win: WindowState) => void;
@@ -133,13 +157,12 @@ function isWindowState(value: unknown): value is WindowState {
 export const useDesktopStore = create<DesktopStore>((set, get) => ({
   windows: [],
   icons: [],
+  restoredIcons: [],
   focusedId: null,
   startMenuOpen: false,
   nextZIndex: 10,
-  apps: [
-    { appId: 'chat', title: '对话', icon: '💬' },
-    { appId: 'files', title: '我的文档', icon: '📁' },
-  ],
+  // 应用注册表来自服务端；此处用共享常量兜底，保证离线时桌面仍可用
+  apps: APP_REGISTRY,
 
   /**
    * 打开应用。
@@ -295,6 +318,9 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
 
   setStartMenuOpen: (open) => set({ startMenuOpen: open }),
   setIcons: (icons) => set({ icons }),
+  // 桌面图标始终跟随应用注册表：注册表新增的应用自动出现，删除的自动消失
+  setApps: (apps) =>
+    set((s) => ({ apps, icons: iconsFromApps(apps, s.restoredIcons) })),
 
   applyRemoteWindows: (windows) =>
     set((s) => ({
@@ -361,6 +387,9 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
    * 只恢复图标布局：窗口状态由服务端 WindowService 持有权威（ADR-004），
    * 前端启动时从 GET /api/desktop/windows 取快照恢复，不走这里的持久化数据，
    * 否则会与服务端权威状态冲突。
+   *
+   * 恢复的图标列表同时存进 restoredIcons：桌面显示哪些图标由应用注册表决定，
+   * 持久化数据只提供位置参考（setApps 会据此重算图标列表）。
    */
   restoreLayout: async () => {
     try {
@@ -369,6 +398,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
       const body = (await res.json()) as { value: DesktopPersisted | null };
       if (!body.value) return;
       set((s) => ({
+        restoredIcons: body.value?.icons ?? s.restoredIcons,
         icons: body.value?.icons ?? s.icons,
       }));
     } catch {
