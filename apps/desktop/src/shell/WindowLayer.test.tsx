@@ -90,3 +90,135 @@ describe('WindowLayer 错误边界', () => {
     view.unmount();
   });
 });
+
+describe('WindowLayer 标题栏菜单与 Alt+Tab', () => {
+  beforeEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    useDesktopStore.setState({ windows: [windowState], focusedId: 'srv-1', nextZIndex: 10 });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = undefined;
+    vi.restoreAllMocks();
+  });
+
+  /** 右键标题栏 */
+  function rightClickTitlebar(container: HTMLElement): void {
+    const bar = container.querySelector<HTMLElement>('.xp-titlebar');
+    if (!bar) throw new Error('no titlebar');
+    act(() => {
+      bar.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 180, clientY: 120 }),
+      );
+    });
+  }
+
+  it('右键标题栏弹出菜单并包含全部菜单项', () => {
+    const view = render(() => createElement('div', null, '应用'));
+    rightClickTitlebar(view.container);
+
+    const menu = view.container.querySelector('[data-testid="context-menu"]');
+    expect(menu).not.toBeNull();
+    const labels = Array.from(
+      view.container.querySelectorAll('[data-testid^="context-menu-item-"]'),
+    ).map((el) => el.textContent);
+    expect(labels).toEqual(['还原', '移动', '大小', '最小化', '最大化', '关闭']);
+    view.unmount();
+  });
+
+  it('普通窗口的「还原」菜单项置灰，最大化窗口时可用', () => {
+    const view = render(() => createElement('div', null, '应用'));
+    rightClickTitlebar(view.container);
+    expect(
+      view.container
+        .querySelector('[data-testid="context-menu-item-还原"]')
+        ?.getAttribute('aria-disabled'),
+    ).toBe('true');
+    view.unmount();
+
+    useDesktopStore.setState({
+      windows: [{ ...windowState, mode: 'maximized' }],
+      focusedId: 'srv-1',
+      nextZIndex: 10,
+    });
+    const view2 = render(() => createElement('div', null, '应用'));
+    rightClickTitlebar(view2.container);
+    expect(
+      view2.container
+        .querySelector('[data-testid="context-menu-item-还原"]')
+        ?.getAttribute('aria-disabled'),
+    ).toBeNull();
+    view2.unmount();
+  });
+
+  it('「移动」「大小」菜单项在本阶段置灰', () => {
+    const view = render(() => createElement('div', null, '应用'));
+    rightClickTitlebar(view.container);
+
+    expect(
+      view.container
+        .querySelector('[data-testid="context-menu-item-移动"]')
+        ?.getAttribute('aria-disabled'),
+    ).toBe('true');
+    expect(
+      view.container
+        .querySelector('[data-testid="context-menu-item-大小"]')
+        ?.getAttribute('aria-disabled'),
+    ).toBe('true');
+    view.unmount();
+  });
+
+  it('点击「关闭」菜单项关闭窗口', () => {
+    const fetchMock = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const view = render(() => createElement('div', null, '应用'));
+    rightClickTitlebar(view.container);
+
+    const item = view.container.querySelector<HTMLElement>(
+      '[data-testid="context-menu-item-关闭"]',
+    );
+    act(() => item!.click());
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/desktop/windows/srv-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+    vi.unstubAllGlobals();
+    view.unmount();
+  });
+
+  it('按住 Alt 弹出窗口切换对话框', () => {
+    const view = render(() => createElement('div', null, '应用'));
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Alt', bubbles: true, cancelable: true }),
+      );
+    });
+
+    expect(view.container.querySelector('[data-testid="alt-tab-switcher"]')).not.toBeNull();
+    expect(view.container.textContent).toContain('对话');
+    view.unmount();
+  });
+
+  it('松开 Alt 关闭切换对话框', () => {
+    const view = render(() => createElement('div', null, '应用'));
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Alt', bubbles: true, cancelable: true }),
+      );
+    });
+    expect(view.container.querySelector('[data-testid="alt-tab-switcher"]')).not.toBeNull();
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keyup', { key: 'Alt', bubbles: true, cancelable: true }),
+      );
+    });
+    expect(view.container.querySelector('[data-testid="alt-tab-switcher"]')).toBeNull();
+    view.unmount();
+  });
+});

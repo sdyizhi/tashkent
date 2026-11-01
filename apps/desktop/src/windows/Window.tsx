@@ -10,7 +10,11 @@ interface Props {
   onClose: () => void;
   onMinimize: () => void;
   onMaximize: () => void;
+  /** 从最大化还原 */
+  onRestore: () => void;
   onMove: (x: number, y: number) => void;
+  /** 右键标题栏：上报事件坐标，用于弹出标题栏菜单 */
+  onContextMenu?: (e: { clientX: number; clientY: number }) => void;
   children: ReactNode;
 }
 
@@ -45,7 +49,9 @@ export default function Window({
   onClose,
   onMinimize,
   onMaximize,
+  onRestore,
   onMove,
+  onContextMenu,
   children,
 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -147,7 +153,13 @@ export default function Window({
       <div
         className={`xp-titlebar${focused ? '' : ' inactive'}`}
         onPointerDown={startDrag}
-        onDoubleClick={() => onMaximize()}
+        // 双击标题栏切换最大化 / 还原（XP 行为）
+        onDoubleClick={() => (maximized ? onRestore() : onMaximize())}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onContextMenu?.({ clientX: e.clientX, clientY: e.clientY });
+        }}
       >
         <span className="xp-titlebar-title">
           {w.icon} {w.title}

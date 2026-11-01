@@ -1,33 +1,55 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-interface Props {
-  items: Array<{ label: string; onSelect: () => void }>;
+export interface ContextMenuItem {
+  /** 菜单项文字 */
+  label: string;
+  /** 点击菜单项时执行 */
+  onSelect: () => void;
+  /** 禁用态：置灰且不响应点击 */
+  disabled?: boolean;
 }
 
-export default function ContextMenu({ items }: Props) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+interface Props {
+  /** 菜单项列表 */
+  items: ContextMenuItem[];
+  /** 菜单左上角的屏幕坐标 */
+  x: number;
+  /** 菜单左上角的屏幕坐标 */
+  y: number;
+  /** 菜单关闭回调（选中菜单项或点击外部时触发） */
+  onClose: () => void;
+}
 
+/**
+ * XP 风格右键菜单。
+ *
+ * 受控组件：位置由调用方给出（右键事件坐标），
+ * 点击菜单项或点击菜单外部时关闭。
+ */
+export default function ContextMenu({ items, x, y, onClose }: Props) {
   useEffect(() => {
-    const close = () => setPos(null);
+    const close = () => onClose();
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
-  }, []);
-
-  if (!pos) return null;
+  }, [onClose]);
 
   return (
     <div
       className="xp-context-menu"
-      style={{ left: pos.x, top: pos.y }}
+      data-testid="context-menu"
+      style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
     >
       {items.map((it) => (
         <div
           key={it.label}
           className="xp-menu-item"
+          data-testid={`context-menu-item-${it.label}`}
+          aria-disabled={it.disabled ? 'true' : undefined}
           onClick={() => {
+            if (it.disabled) return;
             it.onSelect();
-            setPos(null);
+            onClose();
           }}
         >
           {it.label}

@@ -28,6 +28,11 @@ const baseWindow: WindowState = {
 
 interface Handlers {
   onMove: ReturnType<typeof vi.fn>;
+  onMaximize: ReturnType<typeof vi.fn>;
+  onRestore: ReturnType<typeof vi.fn>;
+  onClose: ReturnType<typeof vi.fn>;
+  onMinimize: ReturnType<typeof vi.fn>;
+  onContextMenu: ReturnType<typeof vi.fn>;
   container: HTMLElement;
   root: Root;
   unmount: () => void;
@@ -35,6 +40,11 @@ interface Handlers {
 
 function render(overrides: Partial<WindowState> = {}): Handlers {
   const onMove = vi.fn();
+  const onMaximize = vi.fn();
+  const onRestore = vi.fn();
+  const onClose = vi.fn();
+  const onMinimize = vi.fn();
+  const onContextMenu = vi.fn();
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root: Root = createRoot(container);
@@ -45,10 +55,12 @@ function render(overrides: Partial<WindowState> = {}): Handlers {
       focused: true,
       viewport: { width: 1024, height: 768 },
       onFocus: () => {},
-      onClose: () => {},
-      onMinimize: () => {},
-      onMaximize: () => {},
+      onClose,
+      onMinimize,
+      onMaximize,
+      onRestore,
       onMove,
+      onContextMenu,
       children: createElement('div', null, '内容'),
     });
   }
@@ -59,6 +71,11 @@ function render(overrides: Partial<WindowState> = {}): Handlers {
 
   return {
     onMove,
+    onMaximize,
+    onRestore,
+    onClose,
+    onMinimize,
+    onContextMenu,
     container,
     root,
     unmount: () => {
@@ -244,6 +261,93 @@ describe('Window 拖拽性能', () => {
     expect(view.onMove).toHaveBeenCalledTimes(1);
     expect(view.onMove).toHaveBeenCalledWith(850, 690);
 
+    view.unmount();
+  });
+});
+
+describe('Window 标题栏交互', () => {
+  beforeEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  });
+
+  afterEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = undefined;
+    vi.restoreAllMocks();
+  });
+
+  /** 模拟双击 */
+  function doubleClick(el: HTMLElement): void {
+    act(() => {
+      el.dispatchEvent(
+        new MouseEvent('dblclick', { bubbles: true, cancelable: true, clientX: 150, clientY: 90 }),
+      );
+    });
+  }
+
+  /** 模拟右键 */
+  function rightClick(el: HTMLElement, clientX = 150, clientY = 90): void {
+    act(() => {
+      el.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+        }),
+      );
+    });
+  }
+
+  it('普通窗口双击标题栏时最大化', () => {
+    const view = render({ mode: 'normal' });
+    doubleClick(titlebar(view.container));
+
+    expect(view.onMaximize).toHaveBeenCalledTimes(1);
+    expect(view.onRestore).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('已最大化窗口双击标题栏时还原', () => {
+    const view = render({ mode: 'maximized' });
+    doubleClick(titlebar(view.container));
+
+    expect(view.onRestore).toHaveBeenCalledTimes(1);
+    expect(view.onMaximize).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('已最小化窗口双击标题栏时最大化', () => {
+    const view = render({ mode: 'minimized' });
+    doubleClick(titlebar(view.container));
+
+    expect(view.onMaximize).toHaveBeenCalledTimes(1);
+    view.unmount();
+  });
+
+  it('右键标题栏时上报事件坐标', () => {
+    const view = render();
+    rightClick(titlebar(view.container), 220, 130);
+
+    expect(view.onContextMenu).toHaveBeenCalledTimes(1);
+    expect(view.onContextMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ clientX: 220, clientY: 130 }),
+    );
+    view.unmount();
+  });
+
+  it('右键标题栏不触发浏览器默认菜单', () => {
+    const view = render();
+    const bar = titlebar(view.container);
+    const event = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 220,
+      clientY: 130,
+    });
+    act(() => {
+      bar.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
     view.unmount();
   });
 });

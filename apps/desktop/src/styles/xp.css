@@ -169,6 +169,16 @@ body {
 
 .xp-menu-item:hover { background: var(--xp-blue-start); color: #fff; }
 
+.xp-menu-item[aria-disabled="true"] {
+  color: #808080;
+  cursor: default;
+}
+
+.xp-menu-item[aria-disabled="true"]:hover {
+  background: transparent;
+  color: #808080;
+}
+
 .xp-context-menu {
   position: fixed;
   min-width: 160px;
@@ -177,6 +187,57 @@ body {
   box-shadow: var(--xp-shadow-hard);
   padding: 2px;
   z-index: 10002;
+}
+
+/* ---- Alt+Tab 窗口切换对话框 ---- */
+
+.xp-alt-tab {
+  min-width: 320px;
+  max-width: 560px;
+  background: var(--xp-face);
+  border: 2px solid var(--xp-blue-start);
+  box-shadow: var(--xp-shadow-hard);
+  display: flex;
+  flex-direction: column;
+}
+
+.xp-alt-tab-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  margin: 3px;
+  background: var(--xp-face-light);
+  border: 1px solid var(--xp-border-out);
+}
+
+.xp-alt-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 76px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: center;
+}
+
+.xp-alt-tab-item[data-active="true"] {
+  background: var(--xp-blue-start);
+  border-color: var(--xp-blue-end);
+  color: #fff;
+}
+
+.xp-alt-tab-icon { font-size: 26px; line-height: 1; }
+
+.xp-alt-tab-title {
+  font-size: 11px;
+  line-height: 1.2;
+  max-width: 72px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .xp-desktop-icons {
