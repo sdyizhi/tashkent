@@ -1,4 +1,5 @@
 import { useDesktopStore } from '../state/desktopStore.js';
+import { AppIcon } from '../components/icons/index.js';
 
 export default function DesktopIcons() {
   const icons = useDesktopStore((s) => s.icons);
@@ -17,7 +18,9 @@ export default function DesktopIcons() {
           onDoubleClick={() => void openApp(icon.appId)}
           onClick={() => setStartMenuOpen(false)}
         >
-          <div className="xp-icon">{icon.icon}</div>
+          <div className="xp-icon">
+            <AppIcon appId={icon.appId} emoji={icon.icon} size={32} />
+          </div>
           <div className="xp-desktop-icon-label">{icon.title}</div>
         </div>
       ))}

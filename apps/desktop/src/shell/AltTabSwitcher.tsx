@@ -1,3 +1,5 @@
+import { AppIcon } from '../components/icons/index.js';
+
 export interface AltTabCandidate {
   /** 窗口 id */
   id: string;
@@ -5,6 +7,8 @@ export interface AltTabCandidate {
   title: string;
   /** 窗口图标 */
   icon: string;
+  /** 窗口所属应用（用于挑选自绘 SVG 图标） */
+  appId: string;
 }
 
 interface Props {
@@ -41,7 +45,7 @@ export default function AltTabSwitcher({ candidates, activeId, onActivate, onCan
               onDoubleClick={() => onActivate(c.id)}
             >
               <span className="xp-alt-tab-icon" aria-hidden="true">
-                {c.icon}
+                <AppIcon appId={c.appId} emoji={c.icon} size={32} />
               </span>
               <span className="xp-alt-tab-title">{c.title}</span>
             </div>

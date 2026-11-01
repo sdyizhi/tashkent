@@ -70,8 +70,8 @@ describe('AltTabSwitcher', () => {
   it('展示候选窗口列表', () => {
     const view = render({
       candidates: [
-        { id: 'w1', title: '对话', icon: '💬' },
-        { id: 'w2', title: '我的文档', icon: '📁' },
+        { id: 'w1', title: '对话', icon: '💬', appId: 'chat' },
+        { id: 'w2', title: '我的文档', icon: '📁', appId: 'files' },
       ],
       activeId: 'w1',
     });
@@ -86,8 +86,8 @@ describe('AltTabSwitcher', () => {
   it('高亮当前选中的窗口', () => {
     const view = render({
       candidates: [
-        { id: 'w1', title: '对话', icon: '💬' },
-        { id: 'w2', title: '我的文档', icon: '📁' },
+        { id: 'w1', title: '对话', icon: '💬', appId: 'chat' },
+        { id: 'w2', title: '我的文档', icon: '📁', appId: 'files' },
       ],
       activeId: 'w2',
     });
@@ -107,12 +107,24 @@ describe('AltTabSwitcher', () => {
 
   it('展示窗口图标与标题', () => {
     const view = render({
-      candidates: [{ id: 'w1', title: '我的文档', icon: '📁' }],
+      candidates: [{ id: 'w1', title: '我的文档', icon: '📁', appId: 'files' }],
       activeId: 'w1',
     });
     const item = view.container.querySelector('[data-testid="alt-tab-item-w1"]');
-    expect(item?.textContent).toContain('📁');
+    // files 有自绘 SVG 图标，因此展示的是 SVG 而不是 emoji
+    expect(item?.querySelector('svg')).not.toBeNull();
     expect(item?.textContent).toContain('我的文档');
+    view.unmount();
+  });
+
+  it('没有自绘图标的窗口回退到 emoji', () => {
+    const view = render({
+      candidates: [{ id: 'w1', title: '幽灵', icon: '👻', appId: 'ghost' }],
+      activeId: 'w1',
+    });
+    const item = view.container.querySelector('[data-testid="alt-tab-item-w1"]');
+    expect(item?.querySelector('svg')).toBeNull();
+    expect(item?.textContent).toContain('👻');
     view.unmount();
   });
 });

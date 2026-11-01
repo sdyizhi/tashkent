@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import type { WindowState } from '@tashkent/shared';
 import XPButton from '../components/XPButton.js';
+import { AppIcon } from '../components/icons/index.js';
 
 interface Props {
   window: WindowState;
@@ -162,7 +163,10 @@ export default function Window({
         }}
       >
         <span className="xp-titlebar-title">
-          {w.icon} {w.title}
+          <span className="xp-titlebar-icon">
+            <AppIcon appId={w.appId} emoji={w.icon} size={16} />
+          </span>
+          {w.title}
         </span>
         <span className="xp-titlebar-buttons">
           <XPButton aria-label="最小化" onClick={onMinimize} disabled={!w.minimizable}>

@@ -19,6 +19,11 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
+    // E2E 全局按「减少动效」运行：窗口打开 / 菜单弹出等入场动画
+    // 会让元素在动画期间的位置与最终位置不一致，导致位置类断言变得脆弱。
+    // 视觉基线同样在 reduced 模式下生成 —— 动画的终态与静态样式完全一致，
+    // 基线因此稳定且可复现。
+    reducedMotion: 'reduce',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [

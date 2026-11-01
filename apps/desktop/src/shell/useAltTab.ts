@@ -39,7 +39,7 @@ export function useAltTab({ windows, focusedId, onActivate }: UseAltTabOptions):
     () =>
       [...windows]
         .sort((a, b) => b.zIndex - a.zIndex)
-        .map((w) => ({ id: w.id, title: w.title, icon: w.icon })),
+        .map((w) => ({ id: w.id, title: w.title, icon: w.icon, appId: w.appId })),
     [windows],
   );
 

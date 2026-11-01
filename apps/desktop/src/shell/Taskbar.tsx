@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useDesktopStore } from '../state/desktopStore.js';
 import { useErrorStore } from '../state/errorStore.js';
 import XPTaskbarButton from '../components/XPTaskbarButton.js';
+import { AppIcon } from '../components/icons/index.js';
 
 export default function Taskbar() {
   const windows = useDesktopStore((s) => s.windows);
@@ -38,7 +39,8 @@ export default function Taskbar() {
       {windows.map((w) => (
         <XPTaskbarButton
           key={w.id}
-          label={`${w.icon} ${w.title}`}
+          label={w.title}
+          icon={<AppIcon appId={w.appId} emoji={w.icon} size={16} />}
           active={w.id === focusedId && w.mode !== 'minimized'}
           onClick={() => {
             if (w.mode === 'minimized') void restore(w.id);

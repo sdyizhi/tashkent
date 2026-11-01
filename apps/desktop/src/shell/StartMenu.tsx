@@ -1,5 +1,6 @@
 import type { AppDefinition } from '@tashkent/shared';
 import { useDesktopStore } from '../state/desktopStore.js';
+import { AppIcon } from '../components/icons/index.js';
 
 /** 开始菜单分组顺序：附件在前，系统工具在后 */
 const GROUP_ORDER: AppDefinition['group'][] = ['accessories', 'system'];
@@ -39,8 +40,8 @@ export default function StartMenu() {
                 setOpen(false);
               }}
             >
-              <span className="xp-icon" style={{ width: 24, height: 24, fontSize: 16 }}>
-                {a.icon}
+              <span className="xp-icon xp-icon-menu">
+                <AppIcon appId={a.appId} emoji={a.icon} size={32} />
               </span>
               <span>{a.title}</span>
             </div>
