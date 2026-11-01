@@ -8,6 +8,7 @@ import { desktopRoutes } from './routes/desktop.js';
 import { desktopStateRoutes } from './routes/desktop-state.js';
 import { appRoutes } from './routes/apps.js';
 import { configRoutes } from './routes/config.js';
+import { statsRoutes } from './routes/stats.js';
 import { registerStaticAssets } from './lib/static-assets.js';
 import type { Runtime } from './runtime.js';
 
@@ -50,6 +51,7 @@ export function createApp(rt: Runtime) {
   app.route('/', desktopStateRoutes(rt.desktopState));
   app.route('/', appRoutes());
   app.route('/', configRoutes());
+  app.route('/', statsRoutes(rt));
 
   // 静态托管放在所有 API 路由之后：API 先匹配，未命中的路径才落到前端产物
   registerStaticAssets(app);

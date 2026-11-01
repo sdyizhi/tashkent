@@ -14,6 +14,8 @@ import FilesApp from '../apps/FilesApp.js';
 import NotesApp from '../apps/NotesApp.js';
 import BrowserApp from '../apps/BrowserApp.js';
 import TerminalApp from '../apps/TerminalApp.js';
+import SettingsApp from '../apps/SettingsApp.js';
+import TasksApp from '../apps/TasksApp.js';
 import AuthorizationDialog from '../components/AuthorizationDialog.js';
 
 /**
@@ -32,6 +34,10 @@ function renderAppView(appId: string, sessionId?: string): ReactNode {
       return <BrowserApp sessionId={sessionId} />;
     case 'terminal':
       return <TerminalApp sessionId={sessionId} />;
+    case 'settings':
+      return <SettingsApp sessionId={sessionId} />;
+    case 'tasks':
+      return <TasksApp sessionId={sessionId} />;
     case 'chat':
     default:
       return <ChatApp sessionId={sessionId} />;

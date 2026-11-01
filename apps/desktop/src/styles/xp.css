@@ -652,3 +652,64 @@ body {
   background: var(--xp-face);
   color: #555;
 }
+
+/* ---- 控制面板 / 任务管理器 ---- */
+
+.xp-settings,
+.xp-tasks {
+  height: 100%;
+  overflow: auto;
+  padding: 6px;
+}
+
+.xp-settings-section { margin-bottom: 10px; }
+
+.xp-settings-title {
+  margin: 0 0 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #fff;
+  background: linear-gradient(180deg, var(--xp-blue-start) 0%, var(--xp-blue-end) 100%);
+}
+
+.xp-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  background: #fff;
+}
+
+.xp-settings-table th,
+.xp-settings-table td {
+  padding: 2px 5px;
+  border: 1px solid #d4d0c8;
+  text-align: left;
+  vertical-align: top;
+}
+
+.xp-settings-table th {
+  width: 120px;
+  background: var(--xp-face-light);
+  font-weight: normal;
+}
+
+.xp-settings-table tr[data-danger="true"] td {
+  color: #c0392b;
+  font-weight: bold;
+}
+
+.xp-settings-actions {
+  display: flex;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.xp-tasks-summary {
+  display: flex;
+  gap: 12px;
+  padding: 4px 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  background: var(--xp-face-light);
+  border: 1px solid var(--xp-border-out);
+}

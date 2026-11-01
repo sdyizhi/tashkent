@@ -85,3 +85,18 @@ export interface PublicConfig {
 }
 
 export type { AgentDefinition, WindowState, TokenUsage };
+
+/** 运行统计（任务管理器 / 控制面板的数据源） */
+export interface StatsResponse {
+  agents: Array<{
+    id: string;
+    name: string;
+    icon: string;
+    description: string;
+    toolIds: string[];
+  }>;
+  tools: Array<{ name: string; description: string; permission: string }>;
+  sessions: number;
+  uptimeSec: number;
+  memoryMb: number;
+}
