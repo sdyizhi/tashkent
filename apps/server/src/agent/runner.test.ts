@@ -1,0 +1,133 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import type { AgentEvent, ToolDefinition } from '@tashkent/shared';
+import { EventBus } from '../lib/event-bus.js';
+import { ToolRegistry } from './tool-registry.js';
+import { ToolExecutor } from './tool-executor.js';
+import { AgentRunner } from './runner.js';
+import { scriptedProvider, TEXT_HELLO } from './mock-provider.js';
+
+const agent = {
+  id: 'chat',
+  name: '对话',
+  icon: '💬',
+  description: '通用对话',
+  systemPrompt: '你是助手',
+  toolIds: ['echo'],
+  maxSteps: 4,
+};
+
+function echoTool(): ToolDefinition {
+  return {
+    name: 'echo',
+    description: '回显',
+    inputSchema: z.object({ text: z.string() }),
+    permission: 'safe',
+    execute: async (input: { text: string }) => ({ ok: true, data: { echoed: input.text } }),
+  };
+}
+
+describe('AgentRunner', () => {
+  let bus: EventBus;
+  let registry: ToolRegistry;
+  let events: AgentEvent[];
+
+  beforeEach(() => {
+    bus = new EventBus();
+    registry = new ToolRegistry();
+    registry.register(echoTool());
+    events = [];
+    bus.subscribe((e) => events.push(e.event));
+  });
+
+  it('纯文本回复产生 text_delta 与 run_finished 事件', async () => {
+    const runner = new AgentRunner({
+      provider: scriptedProvider([TEXT_HELLO]),
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+    });
+
+    const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+
+    expect(result.text).toBe('你好');
+    expect(result.events.some((e) => e.type === 'run_started')).toBe(true);
+    expect(result.events.some((e) => e.type === 'run_finished')).toBe(true);
+    expect(events.filter((e) => e.type === 'text_delta')).toHaveLength(1);
+  });
+
+  it('调用工具时发出 tool_start 与 tool_end 事件', async () => {
+    const provider = scriptedProvider([
+      [{ type: 'tool-call', toolCallId: 'c1', toolName: 'echo', args: { text: 'hi' } }],
+      TEXT_HELLO,
+    ]);
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+    });
+
+    const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.events.some((e) => e.type === 'tool_start')).toBe(true);
+    expect(result.events.some((e) => e.type === 'tool_end' && e.ok)).toBe(true);
+  });
+
+  it('工具执行失败时 run 以 error 结束但不抛出', async () => {
+    registry.register({
+      name: 'boom',
+      description: '会炸',
+      inputSchema: z.object({}),
+      permission: 'safe',
+      execute: async () => {
+        throw new Error('炸了');
+      },
+    });
+    const provider = scriptedProvider([
+      [{ type: 'tool-call', toolCallId: 'c1', toolName: 'boom', args: {} }],
+    ]);
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+    });
+
+    const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+    expect(result.error).toBeTruthy();
+  });
+
+  it('未注册的工具被拒绝且记录错误', async () => {
+    const provider = scriptedProvider([
+      [{ type: 'tool-call', toolCallId: 'c1', toolName: 'ghost', args: {} }],
+    ]);
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+    });
+
+    const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+    const end = result.events.find((e) => e.type === 'tool_end');
+    expect(end && end.type === 'tool_end' && end.ok).toBe(false);
+  });
+
+  it('事件被发布到 EventBus', async () => {
+    const runner = new AgentRunner({
+      provider: scriptedProvider([TEXT_HELLO]),
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+    });
+    await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+    expect(events.length).toBeGreaterThan(0);
+  });
+});
