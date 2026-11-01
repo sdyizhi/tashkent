@@ -33,9 +33,9 @@ export default function WindowLayer({ renderApp }: Props) {
             focused={w.id === focusedId}
             viewport={viewport}
             onFocus={() => focus(w.id)}
-            onClose={() => close(w.id)}
-            onMinimize={() => minimize(w.id)}
-            onMaximize={() => maximize(w.id)}
+            onClose={() => void close(w.id)}
+            onMinimize={() => void minimize(w.id)}
+            onMaximize={() => void maximize(w.id)}
             onMove={(x, y) => move(w.id, x, y)}
           >
             {renderApp(w.appId, w.sessionId, w.params)}

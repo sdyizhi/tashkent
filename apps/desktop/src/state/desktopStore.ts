@@ -42,11 +42,11 @@ interface DesktopStore {
   nextZIndex: number;
   apps: AppMeta[];
 
-  openApp: (appId: string, params?: Record<string, unknown>) => void;
-  close: (id: string) => void;
-  minimize: (id: string) => void;
-  maximize: (id: string) => void;
-  restore: (id: string) => void;
+  openApp: (appId: string, params?: Record<string, unknown>) => Promise<string | null>;
+  close: (id: string) => Promise<void>;
+  minimize: (id: string) => Promise<void>;
+  maximize: (id: string) => Promise<void>;
+  restore: (id: string) => Promise<void>;
   move: (id: string, x: number, y: number) => void;
   resize: (id: string, width: number, height: number) => void;
   focus: (id: string) => void;
@@ -73,26 +73,39 @@ function nextId(): string {
   return `w_${Date.now().toString(36)}_${idCounter}`;
 }
 
+/** 命令提交结果：ok 表示服务端确认成功，body 是服务端返回的载荷 */
+interface CommandResult {
+  ok: boolean;
+  body: unknown;
+}
+
 /**
  * 提交窗口命令到服务端。
  *
  * 服务端是窗口状态的权威源（ADR-004）：前端只提交「意图」，
- * 权威状态由服务端更新后再通过事件广播回来。
+ * 权威状态由服务端更新后再通过响应 / 事件广播回来。
  */
 async function sendWindowCommand(
   method: 'POST' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
-): Promise<boolean> {
+): Promise<CommandResult> {
   try {
     const res = await fetch(path, {
       method,
       headers: { 'content-type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    return res.ok;
+    if (!res.ok) return { ok: false, body: null };
+    let payload: unknown = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+    return { ok: true, body: payload };
   } catch {
-    return false;
+    return { ok: false, body: null };
   }
 }
 
@@ -106,6 +119,13 @@ function toPatch(w: WindowState): Partial<WindowState> {
     mode: w.mode,
     restoreGeometry: w.restoreGeometry,
   };
+}
+
+/** 判断服务端载荷是否是完整的窗口对象 */
+function isWindowState(value: unknown): value is WindowState {
+  if (!value || typeof value !== 'object') return false;
+  const w = value as Partial<WindowState>;
+  return typeof w.id === 'string' && typeof w.appId === 'string' && typeof w.mode === 'string';
 }
 
 export const useDesktopStore = create<DesktopStore>((set, get) => ({
@@ -122,64 +142,113 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
   /**
    * 打开应用。
    *
-   * 服务端创建窗口并分配权威 id，前端用服务端返回的窗口对象落地；
-   * 服务端随后广播的 desktop_window_opened 事件会再写回同一个 id（幂等）。
-   * 只有服务端不可达时才退化为本地窗口，保证离线时桌面仍可用。
+   * ADR-004：前端不做乐观更新。先把命令提交给服务端，
+   * 等服务端确认（响应载荷 / desktop_window_opened 事件）后再落地本地状态。
+   * 只有命令失败（服务端不可达）时才退化为本地窗口，保证离线时桌面仍可用。
+   *
+   * @returns 新窗口的 id；命令失败且本地退化时返回本地 id
    */
-  openApp: (appId, params) => {
-    void (async () => {
-      const res = await sendWindowCommand('POST', '/api/desktop/windows', { appId, params });
-      if (res) return; // 服务端会广播事件，前端按事件落地
-      const id = nextId();
-      const z = get().nextZIndex + 1;
-      const offset = (get().windows.length % 6) * 24;
-      const win = createWindow({
-        id,
-        appId,
-        x: 120 + offset,
-        y: 80 + offset,
-        width: 640,
-        height: 480,
-        zIndex: z,
-        apps: get().apps,
-        params,
-      });
-      set((s) => ({ windows: [...s.windows, win], focusedId: id, nextZIndex: z }));
-    })();
+  openApp: async (appId, params) => {
+    const res = await sendWindowCommand('POST', '/api/desktop/windows', { appId, params });
+    if (res.ok) {
+      // 服务端返回权威窗口对象：按它落地（事件回写是幂等的二次确认）
+      if (isWindowState(res.body)) {
+        const win = res.body;
+        set((s) => ({
+          windows: s.windows.some((w) => w.id === win.id)
+            ? s.windows.map((w) => (w.id === win.id ? win : w))
+            : [...s.windows, win],
+          focusedId: win.id,
+          nextZIndex: Math.max(s.nextZIndex, win.zIndex),
+        }));
+        return win.id;
+      }
+      // 服务端没给出窗口对象：等 desktop_window_opened 事件回写
+      return null;
+    }
+
+    // 服务端不可达：退化为本地窗口
+    const id = nextId();
+    const z = get().nextZIndex + 1;
+    const offset = (get().windows.length % 6) * 24;
+    const win = createWindow({
+      id,
+      appId,
+      x: 120 + offset,
+      y: 80 + offset,
+      width: 640,
+      height: 480,
+      zIndex: z,
+      apps: get().apps,
+      params,
+    });
+    set((s) => ({ windows: [...s.windows, win], focusedId: id, nextZIndex: z }));
+    return id;
   },
 
-  close: (id) => {
+  /**
+   * 关闭窗口。
+   *
+   * 先提交命令，服务端确认后再移除本地窗口；
+   * 服务端随后广播的 desktop_window_closed 事件是幂等的二次确认。
+   */
+  close: async (id) => {
+    const res = await sendWindowCommand('DELETE', `/api/desktop/windows/${id}`);
+    if (!res.ok) return; // 服务端未确认，本地保持原样
     set((s) => ({
       windows: s.windows.filter((w) => w.id !== id),
       focusedId: s.focusedId === id ? null : s.focusedId,
     }));
-    void sendWindowCommand('DELETE', `/api/desktop/windows/${id}`);
   },
 
-  minimize: (id) =>
-    set((s) => {
-      const windows = s.windows.map((w) => (w.id === id ? minimizeWindow(w) : w));
-      const target = windows.find((w) => w.id === id);
-      if (target) void sendWindowCommand('PATCH', `/api/desktop/windows/${id}`, toPatch(target));
-      return { windows };
-    }),
+  /** 最小化：提交命令，服务端确认后再改本地状态 */
+  minimize: async (id) => {
+    const current = get().windows.find((w) => w.id === id);
+    if (!current) return;
+    const res = await sendWindowCommand(
+      'PATCH',
+      `/api/desktop/windows/${id}`,
+      toPatch(minimizeWindow(current)),
+    );
+    if (!res.ok) return;
+    const next = isWindowState(res.body) ? res.body : minimizeWindow(current);
+    set((s) => ({ windows: s.windows.map((w) => (w.id === id ? next : w)) }));
+  },
 
-  maximize: (id) =>
-    set((s) => {
-      const windows = s.windows.map((w) => (w.id === id ? maximizeWindow(w) : w));
-      const target = windows.find((w) => w.id === id);
-      if (target) void sendWindowCommand('PATCH', `/api/desktop/windows/${id}`, toPatch(target));
-      return { windows };
-    }),
+  /** 最大化：提交命令，服务端确认后再改本地状态 */
+  maximize: async (id) => {
+    const current = get().windows.find((w) => w.id === id);
+    if (!current) return;
+    const res = await sendWindowCommand(
+      'PATCH',
+      `/api/desktop/windows/${id}`,
+      toPatch(maximizeWindow(current)),
+    );
+    if (!res.ok) return;
+    const next = isWindowState(res.body) ? res.body : maximizeWindow(current);
+    set((s) => ({ windows: s.windows.map((w) => (w.id === id ? next : w)) }));
+  },
 
-  restore: (id) =>
-    set((s) => {
-      const windows = s.windows.map((w) => (w.id === id ? restoreWindow(w) : w));
-      const target = windows.find((w) => w.id === id);
-      if (target) void sendWindowCommand('PATCH', `/api/desktop/windows/${id}`, toPatch(target));
-      return { windows };
-    }),
+  /** 还原：提交命令，服务端确认后再改本地状态 */
+  restore: async (id) => {
+    const current = get().windows.find((w) => w.id === id);
+    if (!current) return;
+    const res = await sendWindowCommand(
+      'PATCH',
+      `/api/desktop/windows/${id}`,
+      toPatch(restoreWindow(current)),
+    );
+    if (!res.ok) return;
+    const next = isWindowState(res.body) ? res.body : restoreWindow(current);
+    set((s) => ({ windows: s.windows.map((w) => (w.id === id ? next : w)) }));
+  },
 
+  /**
+   * 移动窗口。
+   *
+   * 拖拽是高频操作，设计文档 5.2 允许「本地即时 + 服务端节流确认」，
+   * 因此这里保留乐观更新（否则拖拽会卡顿），服务端事件回写会做二次校正。
+   */
   move: (id, x, y) => {
     set((s) => ({ windows: s.windows.map((w) => (w.id === id ? moveWindow(w, x, y) : w)) }));
     void sendWindowCommand('PATCH', `/api/desktop/windows/${id}`, { x, y });

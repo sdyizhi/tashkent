@@ -17,7 +17,7 @@ export default function StartMenu() {
           className="xp-menu-item"
           data-testid={`start-menu-item-${a.appId}`}
           onClick={() => {
-            openApp(a.appId);
+            void openApp(a.appId);
             setOpen(false);
           }}
         >

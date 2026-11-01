@@ -35,8 +35,8 @@ export default function Taskbar() {
           label={`${w.icon} ${w.title}`}
           active={w.id === focusedId && w.mode !== 'minimized'}
           onClick={() => {
-            if (w.mode === 'minimized') restore(w.id);
-            else if (w.id === focusedId) minimize(w.id);
+            if (w.mode === 'minimized') void restore(w.id);
+            else if (w.id === focusedId) void minimize(w.id);
             else focus(w.id);
           }}
         />

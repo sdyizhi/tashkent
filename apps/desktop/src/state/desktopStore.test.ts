@@ -22,6 +22,15 @@ function remoteWindow(id: string, overrides: Partial<WindowState> = {}): WindowS
   };
 }
 
+/** 可手动兑现的 Promise，用于模拟「服务端还没回话」 */
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 describe('desktopStore 服务端窗口同步', () => {
   beforeEach(() => {
     useDesktopStore.setState({ windows: [], focusedId: null, nextZIndex: 10 });
@@ -122,13 +131,12 @@ describe('desktopStore 窗口命令（服务端为权威源）', () => {
     vi.unstubAllGlobals();
   });
 
-  it('close 向服务端提交关闭命令', async () => {
+  it('close 向服务端提交关闭命令，服务端确认后才移除本地窗口', async () => {
     const fetchMock = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
-    useDesktopStore.getState().close('srv-1');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await useDesktopStore.getState().close('srv-1');
 
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/desktop/windows/srv-1');
@@ -164,6 +172,165 @@ describe('desktopStore 窗口命令（服务端为权威源）', () => {
     useDesktopStore.getState().openApp('chat');
     await vi.waitFor(() => expect(useDesktopStore.getState().windows).toHaveLength(1));
     expect(useDesktopStore.getState().windows[0]?.appId).toBe('chat');
+
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('desktopStore 窗口命令不做乐观更新（ADR-004）', () => {
+  beforeEach(() => {
+    useDesktopStore.setState({ windows: [], icons: [], focusedId: null, nextZIndex: 10 });
+    vi.restoreAllMocks();
+  });
+
+  it('openApp 在服务端响应前不落地任何本地窗口', async () => {
+    const gate = deferred<Response>();
+    const fetchMock = vi.fn(() => gate.promise);
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().openApp('chat');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    // 服务端还没回话：本地不得出现窗口（不做乐观更新）
+    expect(useDesktopStore.getState().windows).toHaveLength(0);
+
+    gate.resolve(new Response('{}', { status: 201 }));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    vi.unstubAllGlobals();
+  });
+
+  it('openApp 在服务端响应后按服务端返回的窗口落地', async () => {
+    const serverWindow = remoteWindow('srv-new', { appId: 'chat' });
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(serverWindow), { status: 201 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().openApp('chat');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.id).toBe('srv-new');
+    expect(useDesktopStore.getState().focusedId).toBe('srv-new');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('openApp 返回新窗口的 id', async () => {
+    const serverWindow = remoteWindow('srv-id', { appId: 'chat' });
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(serverWindow), { status: 201 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const id = await useDesktopStore.getState().openApp('chat');
+    expect(id).toBe('srv-id');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('openApp 在服务端返回失败状态时退化为本地窗口', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().openApp('chat');
+
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.appId).toBe('chat');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('minimize 在服务端响应前不改本地状态', async () => {
+    const gate = deferred<Response>();
+    const fetchMock = vi.fn(() => gate.promise);
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    useDesktopStore.getState().minimize('srv-1');
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(useDesktopStore.getState().windows[0]?.mode).toBe('normal');
+
+    gate.resolve(new Response('{}', { status: 200 }));
+    await Promise.resolve();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('maximize 在服务端响应前不改本地状态', async () => {
+    const gate = deferred<Response>();
+    const fetchMock = vi.fn(() => gate.promise);
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    useDesktopStore.getState().maximize('srv-1');
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(useDesktopStore.getState().windows[0]?.mode).toBe('normal');
+
+    gate.resolve(new Response('{}', { status: 200 }));
+    await Promise.resolve();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('restore 在服务端响应前不改本地状态', async () => {
+    const gate = deferred<Response>();
+    const fetchMock = vi.fn(() => gate.promise);
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(
+      remoteWindow('srv-1', {
+        mode: 'maximized',
+        restoreGeometry: { x: 100, y: 80, width: 640, height: 480 },
+      }),
+    );
+    useDesktopStore.getState().restore('srv-1');
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(useDesktopStore.getState().windows[0]?.mode).toBe('maximized');
+
+    gate.resolve(new Response('{}', { status: 200 }));
+    await Promise.resolve();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('close 在服务端响应前不删除本地窗口', async () => {
+    const gate = deferred<Response>();
+    const fetchMock = vi.fn(() => gate.promise);
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    useDesktopStore.getState().close('srv-1');
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(useDesktopStore.getState().windows).toHaveLength(1);
+
+    gate.resolve(new Response('{}', { status: 200 }));
+    await Promise.resolve();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('move 属于高频操作：本地即时更新并向服务端提交几何补丁', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    useDesktopStore.getState().move('srv-1', 300, 400);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/desktop/windows/srv-1');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(String(init.body))).toEqual({ x: 300, y: 400 });
+    // 拖拽允许「本地即时 + 服务端确认」
+    expect(useDesktopStore.getState().windows[0]?.x).toBe(300);
 
     vi.unstubAllGlobals();
   });

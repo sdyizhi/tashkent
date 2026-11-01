@@ -14,7 +14,7 @@ export default function DesktopIcons() {
           key={icon.appId}
           className="xp-desktop-icon"
           data-testid={`desktop-icon-${icon.appId}`}
-          onDoubleClick={() => openApp(icon.appId)}
+          onDoubleClick={() => void openApp(icon.appId)}
           onClick={() => setStartMenuOpen(false)}
         >
           <div className="xp-icon">{icon.icon}</div>
