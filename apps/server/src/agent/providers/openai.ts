@@ -67,7 +67,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
         temperature: req.temperature,
         maxOutputTokens: req.maxOutputTokens,
         abortSignal: req.abortSignal,
-        stopWhen: stepCountIs(20),
+        stopWhen: stepCountIs(req.maxSteps ?? 8),
       });
 
       for await (const part of result.fullStream) {

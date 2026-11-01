@@ -20,6 +20,8 @@ export interface LLMRequest {
   executeTool?: (name: string, args: unknown, toolCallId: string) => Promise<unknown>;
   temperature?: number;
   maxOutputTokens?: number;
+  /** 工具调用循环的最大步数（agent 可覆盖配置默认值） */
+  maxSteps?: number;
   abortSignal?: AbortSignal;
   system?: string;
 }

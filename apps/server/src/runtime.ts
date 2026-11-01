@@ -87,6 +87,7 @@ export function createRuntime(deps: RuntimeDeps) {
     contextKeepTurns: config.contextKeepTurns,
     maxInputTokens: config.maxInputTokens,
     toolResultMaxBytes: config.toolResultMaxBytes,
+    maxSteps: config.maxSteps,
   });
 
   fs.mkdirSync(path.resolve(config.workspaceDir), { recursive: true });

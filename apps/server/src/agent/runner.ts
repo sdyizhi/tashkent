@@ -31,6 +31,8 @@ export interface RunnerDeps {
   contextKeepTurns: number;
   maxInputTokens: number;
   toolResultMaxBytes: number;
+  /** 单次运行的工具调用轮数上限（agent 可用 maxSteps 覆盖） */
+  maxSteps: number;
 }
 
 /**
@@ -109,6 +111,7 @@ export class AgentRunner {
           inputSchema: t.inputSchema,
         })),
         temperature: input.agent.temperature,
+        maxSteps: input.agent.maxSteps ?? this.deps.maxSteps,
         // 工具真实执行在此发生：AI SDK 的工具循环会把返回结果作为 tool 消息回传给模型，
         // 同时我们借此把 tool_start / tool_end 事件发到桌面。
         executeTool: async (name, args, toolCallId) => {

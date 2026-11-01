@@ -52,6 +52,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -76,6 +77,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -107,6 +109,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -126,6 +129,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -143,6 +147,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
     await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
     expect(events.length).toBeGreaterThan(0);
@@ -161,6 +166,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -203,6 +209,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -212,6 +219,60 @@ describe('AgentRunner', () => {
     expect(authEvent && authEvent.type === 'authorization_required' && authEvent.authorizationId).toBe('auth-1');
     expect(authEvent && authEvent.type === 'authorization_required' && authEvent.sessionId).toBe('s1');
     expect(authEvent && authEvent.type === 'authorization_required' && authEvent.toolCallId).toBe('c1');
+  });
+
+  it('把 agent.maxSteps 传给 provider', async () => {
+    let seen: LLMRequest | undefined;
+    const provider: LLMProvider = {
+      async *stream(req) {
+        seen = req;
+        yield { type: 'text-delta', text: 'ok' };
+      },
+    };
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
+      maxSteps: 8,
+    });
+
+    await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+    expect(seen?.maxSteps).toBe(4); // agent.maxSteps = 4
+  });
+
+  it('agent 未声明 maxSteps 时用配置默认值', async () => {
+    let seen: LLMRequest | undefined;
+    const provider: LLMProvider = {
+      async *stream(req) {
+        seen = req;
+        yield { type: 'text-delta', text: 'ok' };
+      },
+    };
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
+      maxSteps: 8,
+    });
+
+    const { maxSteps: _ignored, ...agentWithoutSteps } = agent;
+    await runner.run({
+      sessionId: 's1',
+      agentId: 'chat',
+      agent: agentWithoutSteps,
+      userText: 'hi',
+    });
+    expect(seen?.maxSteps).toBe(8);
   });
 
   it('裁剪历史：只保留最近 N 轮', async () => {
@@ -235,6 +296,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 1,
       maxInputTokens: 120000,
       toolResultMaxBytes: 8192,
+      maxSteps: 8,
     });
 
     await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: '本轮提问' });
@@ -274,6 +336,7 @@ describe('AgentRunner', () => {
       contextKeepTurns: 20,
       maxInputTokens: 120000,
       toolResultMaxBytes: 100,
+      maxSteps: 8,
     });
 
     await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: '继续' });
