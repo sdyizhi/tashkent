@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { WindowState } from '@tashkent/shared';
+import type { WindowState, WindowsResponse } from '@tashkent/shared';
 import {
   closeWindow,
   createWindow,
@@ -63,6 +63,8 @@ interface DesktopStore {
   persist: () => Promise<void>;
   /** 从服务端恢复桌面布局（与窗口的 restore(id) 区分） */
   restoreLayout: () => Promise<void>;
+  /** 从服务端恢复窗口列表（服务端是窗口状态的权威源） */
+  restoreWindows: () => Promise<void>;
 }
 
 let idCounter = 0;
@@ -273,6 +275,23 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
       }));
     } catch {
       // 恢复失败时使用默认桌面
+    }
+  },
+
+  /**
+   * 从服务端恢复窗口列表。
+   *
+   * 服务端是窗口状态的权威源（ADR-004）：重启后窗口布局由服务端持久化，
+   * 前端启动时拉取权威快照并渲染，自身只做镜像。
+   */
+  restoreWindows: async () => {
+    try {
+      const res = await fetch('/api/desktop/windows');
+      if (!res.ok) return;
+      const body = (await res.json()) as WindowsResponse;
+      get().applyRemoteWindows(body.windows ?? []);
+    } catch {
+      // 服务端不可达时保持空桌面
     }
   },
 }));

@@ -24,6 +24,7 @@ export default function DesktopRoot() {
   const windows = useDesktopStore((s) => s.windows);
   const icons = useDesktopStore((s) => s.icons);
 
+  // useDesktopEvents 会在启动时拉取服务端权威的窗口列表快照（重启后布局得以恢复）
   const { notifications, dismissNotification } = useDesktopEvents();
 
   const authRequest = useAuthorizationStore((s) => s.request);

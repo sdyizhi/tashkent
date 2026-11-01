@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { WindowState } from '@tashkent/shared';
 import type { AppConfig } from './lib/config.js';
 import { EventBus } from './lib/event-bus.js';
 import { AgentRegistry } from './agent/registry.js';
@@ -27,6 +28,12 @@ export interface RuntimeDeps {
   config: AppConfig;
 }
 
+/** 窗口列表在 desktop_state 表里的键 */
+const WINDOWS_STATE_KEY = 'windows';
+
+/** 窗口布局写入存储的防抖间隔（毫秒） */
+const WINDOWS_PERSIST_DEBOUNCE_MS = 200;
+
 export function createRuntime(deps: RuntimeDeps) {
   const { config } = deps;
 
@@ -34,6 +41,19 @@ export function createRuntime(deps: RuntimeDeps) {
   const registry = new AgentRegistry();
   registry.registerAll(BUILTIN_AGENTS);
   registry.loadFromDir(path.join(path.dirname(config.dbFile), 'agents'));
+
+  const desktopState = new DesktopStateRepository(deps.db);
+
+  // 窗口布局持久化：窗口列表落 desktop_state 表，重启后可恢复（M4 验收标准）。
+  // 保存走 200ms 防抖，避免拖拽时高频写 SQLite。
+  let persistTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingWindows: WindowState[] | null = null;
+  const flushWindows = (): void => {
+    persistTimer = null;
+    if (pendingWindows === null) return;
+    desktopState.set(WINDOWS_STATE_KEY, pendingWindows);
+    pendingWindows = null;
+  };
 
   const toolRegistry = new ToolRegistry();
   const windowService = new WindowService({
@@ -43,6 +63,14 @@ export function createRuntime(deps: RuntimeDeps) {
     ],
     defaultWidth: 640,
     defaultHeight: 480,
+    persistence: {
+      load: () => desktopState.get<WindowState[]>(WINDOWS_STATE_KEY, []),
+      save: (windows) => {
+        pendingWindows = windows;
+        if (persistTimer) clearTimeout(persistTimer);
+        persistTimer = setTimeout(flushWindows, WINDOWS_PERSIST_DEBOUNCE_MS);
+      },
+    },
   });
 
   toolRegistry.registerAll(createFsTools(path.resolve(config.workspaceDir)));
@@ -120,7 +148,7 @@ export function createRuntime(deps: RuntimeDeps) {
     authz,
     messages,
     sessions,
-    desktopState: new DesktopStateRepository(deps.db),
+    desktopState,
   };
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AgentEvent, WindowsResponse } from '@tashkent/shared';
+import type { AgentEvent } from '@tashkent/shared';
 import { agentEventStream, type AgentEventSource } from './agentEvents.js';
 import { useDesktopStore } from './desktopStore.js';
 import { useAuthorizationStore } from './authorizationStore.js';
@@ -88,15 +88,8 @@ export function useDesktopEvents(
     const off = source.subscribe(handle);
 
     void (async () => {
-      try {
-        const res = await fetch('/api/desktop/windows');
-        if (res.ok) {
-          const body = (await res.json()) as WindowsResponse;
-          useDesktopStore.getState().applyRemoteWindows(body.windows);
-        }
-      } catch {
-        // 服务端不可达时保持空桌面，窗口由 Agent 事件创建
-      }
+      // 拉取服务端权威的窗口列表快照（服务端持久化，重启后布局得以恢复）
+      await useDesktopStore.getState().restoreWindows();
       hydrated = true;
       for (const item of pending) apply(item.event);
       pending.length = 0;

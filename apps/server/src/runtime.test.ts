@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRuntime } from './runtime.js';
+import { createDatabase } from './db/index.js';
 import type { AppConfig } from './lib/config.js';
 
 const testConfig: AppConfig = {
@@ -41,5 +42,43 @@ describe('createRuntime', () => {
     expect(names).toContain('fs.read');
     expect(names).toContain('desktop.open_app');
     expect(names).toContain('shell.exec');
+  });
+});
+
+describe('窗口布局持久化（重启恢复）', () => {
+  it('窗口列表落库，新 runtime 实例可恢复', async () => {
+    const db = createDatabase(':memory:');
+    const rt = createRuntime({ db, config: testConfig });
+
+    const win = rt.windowService.open('chat');
+    rt.windowService.update(win.id, { x: 321, y: 234 });
+
+    // 防抖写入：等 200ms 落库
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    const stored = rt.desktopState.get<unknown[]>('windows', []);
+    expect(Array.isArray(stored)).toBe(true);
+    expect(stored).toHaveLength(1);
+    expect((stored[0] as { id: string }).id).toBe(win.id);
+
+    // 模拟重启：新建 runtime（同一份数据库），窗口应被恢复
+    const restarted = createRuntime({ db, config: testConfig });
+    const restored = restarted.windowService.list();
+    expect(restored).toHaveLength(1);
+    expect(restored[0]?.id).toBe(win.id);
+    expect(restored[0]?.x).toBe(321);
+    expect(restored[0]?.y).toBe(234);
+  });
+
+  it('关闭的窗口不会在重启后复活', async () => {
+    const db = createDatabase(':memory:');
+    const rt = createRuntime({ db, config: testConfig });
+
+    const win = rt.windowService.open('chat');
+    rt.windowService.close(win.id);
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    const restarted = createRuntime({ db, config: testConfig });
+    expect(restarted.windowService.list()).toHaveLength(0);
   });
 });

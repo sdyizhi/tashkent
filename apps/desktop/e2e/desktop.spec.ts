@@ -53,4 +53,34 @@ test.describe('桌面外壳交互', () => {
     const after = await win.boundingBox();
     expect(after?.x).not.toBe(before.x);
   });
+
+  test('窗口布局由服务端权威持有，刷新后恢复', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('desktop-icon-chat').dblclick();
+    const win = page.getByTestId('window-chat');
+    await expect(win).toBeVisible();
+
+    const before = await win.boundingBox();
+    if (!before) throw new Error('no bounding box');
+
+    // 服务端权威列表里应能看到该窗口
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get('/api/desktop/windows');
+          if (!res.ok()) return 0;
+          const body = (await res.json()) as { windows: Array<{ id: string }> };
+          return body.windows.length;
+        },
+        { timeout: 15000 },
+      )
+      .toBeGreaterThan(0);
+
+    // 刷新页面：窗口应按服务端持久化的布局恢复
+    await page.reload();
+    await expect(page.getByTestId('window-chat')).toBeVisible();
+    const after = await page.getByTestId('window-chat').boundingBox();
+    expect(Math.round(after?.x ?? -1)).toBe(Math.round(before.x));
+    expect(Math.round(after?.y ?? -1)).toBe(Math.round(before.y));
+  });
 });

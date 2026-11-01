@@ -253,3 +253,76 @@ describe('desktopStore 桌面状态持久化', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('desktopStore 窗口列表恢复（服务端权威源）', () => {
+  beforeEach(() => {
+    useDesktopStore.setState({ windows: [], icons: [], focusedId: null, nextZIndex: 10 });
+    vi.restoreAllMocks();
+  });
+
+  it('restoreWindows 从服务端拉取权威窗口列表', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            windows: [
+              {
+                id: 'srv-1',
+                appId: 'chat',
+                title: '对话',
+                icon: '💬',
+                mode: 'normal',
+                x: 120,
+                y: 80,
+                width: 640,
+                height: 480,
+                zIndex: 11,
+                restoreGeometry: { x: 120, y: 80, width: 640, height: 480 },
+                resizable: true,
+                minimizable: true,
+                maximizable: true,
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().restoreWindows();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/desktop/windows');
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.id).toBe('srv-1');
+    expect(windows[0]?.x).toBe(120);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('restoreWindows 在服务端无窗口时清空列表', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"windows":[]}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('old'));
+    await useDesktopStore.getState().restoreWindows();
+
+    expect(useDesktopStore.getState().windows).toHaveLength(0);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('restoreWindows 请求失败时保持现状', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    await expect(useDesktopStore.getState().restoreWindows()).resolves.toBeUndefined();
+
+    expect(useDesktopStore.getState().windows).toHaveLength(1);
+
+    vi.unstubAllGlobals();
+  });
+});
