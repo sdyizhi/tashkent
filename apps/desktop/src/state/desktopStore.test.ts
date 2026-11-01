@@ -363,6 +363,155 @@ describe('desktopStore 窗口命令不做乐观更新（ADR-004）', () => {
   });
 });
 
+describe('desktopStore 幂等打开（XP 语义：已有窗口则聚焦，不新建）', () => {
+  beforeEach(() => {
+    useDesktopStore.setState({ windows: [], icons: [], focusedId: null, nextZIndex: 10 });
+    vi.restoreAllMocks();
+  });
+
+  it('服务端返回已存在的窗口时本地只更新不新增', async () => {
+    const serverWindow = remoteWindow('srv-1', { appId: 'chat' });
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(serverWindow), { status: 201 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    // 模拟服务端幂等：两次都返回同一个窗口 id
+    await useDesktopStore.getState().openApp('chat');
+    await useDesktopStore.getState().openApp('chat');
+
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.id).toBe('srv-1');
+    expect(useDesktopStore.getState().focusedId).toBe('srv-1');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('服务端返回不同 appId 的窗口时各自落地', async () => {
+    const chatWindow = remoteWindow('srv-chat', { appId: 'chat' });
+    const filesWindow = remoteWindow('srv-files', { appId: 'files', title: '我的文档' });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(chatWindow), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(filesWindow), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().openApp('chat');
+    await useDesktopStore.getState().openApp('files');
+
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(2);
+    expect(windows.map((w) => w.appId).sort()).toEqual(['chat', 'files']);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('服务端返回最小化窗口被恢复时本地同步为 normal', async () => {
+    const serverWindow = remoteWindow('srv-1', { appId: 'chat', mode: 'normal' });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(serverWindow), { status: 201 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ...serverWindow, mode: 'normal', zIndex: 12 }), {
+          status: 201,
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().openApp('chat');
+    await useDesktopStore.getState().openApp('chat');
+
+    const win = useDesktopStore.getState().windows[0];
+    expect(win?.mode).toBe('normal');
+    expect(win?.zIndex).toBe(12);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('openApp 始终返回服务端给出的窗口 id', async () => {
+    const serverWindow = remoteWindow('srv-focus', { appId: 'chat' });
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(serverWindow), { status: 201 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const id = await useDesktopStore.getState().openApp('chat');
+    expect(id).toBe('srv-focus');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('服务端不可达时本地退化也遵循幂等：同 appId 不重复建窗', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await useDesktopStore.getState().openApp('chat');
+    const second = await useDesktopStore.getState().openApp('chat');
+
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(second).toBe(first);
+    expect(useDesktopStore.getState().focusedId).toBe(first);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('本地已存在同 appId 的陈旧副本时，服务端返回的窗口原位取代它', async () => {
+    // 本地有一个旧的 chat 窗口（与服务端 id 不同）
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('stale-1', { appId: 'chat' }));
+
+    const serverWindow = remoteWindow('srv-1', { appId: 'chat', zIndex: 20 });
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify(serverWindow), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().openApp('chat');
+
+    const windows = useDesktopStore.getState().windows;
+    expect(windows).toHaveLength(1);
+    expect(windows[0]?.id).toBe('srv-1');
+    expect(useDesktopStore.getState().focusedId).toBe('srv-1');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('聚焦已有窗口不会改变窗口在列表中的顺序', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(remoteWindow('srv-chat', { appId: 'chat', zIndex: 11 })), {
+          status: 201,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(remoteWindow('srv-files', { appId: 'files', zIndex: 12 })), {
+          status: 201,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(remoteWindow('srv-chat', { appId: 'chat', zIndex: 30 })), {
+          status: 200,
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().openApp('chat');
+    await useDesktopStore.getState().openApp('files');
+    await useDesktopStore.getState().openApp('chat');
+
+    const windows = useDesktopStore.getState().windows;
+    expect(windows.map((w) => w.id)).toEqual(['srv-chat', 'srv-files']);
+    expect(windows[0]?.zIndex).toBe(30);
+    expect(useDesktopStore.getState().focusedId).toBe('srv-chat');
+
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('desktopStore 桌面状态持久化', () => {
   beforeEach(() => {
     useDesktopStore.setState({ windows: [], icons: [], focusedId: null, nextZIndex: 10 });

@@ -50,6 +50,16 @@ function isWindowState(value: unknown): value is WindowState {
   );
 }
 
+/**
+ * 幂等打开的结果。
+ *
+ * created = true 表示新建了窗口；false 表示命中已有窗口并执行了聚焦 / 恢复。
+ */
+export interface OpenOrFocusResult {
+  window: WindowState;
+  created: boolean;
+}
+
 export class WindowService {
   private readonly windows = new Map<string, WindowState>();
   private zIndex = 10;
@@ -70,10 +80,16 @@ export class WindowService {
       return;
     }
     if (!Array.isArray(saved)) return;
+    // 一个应用一个窗口：恢复时按 appId 去重，保留 zIndex 更高（更靠前）的那个
+    const byApp = new Map<string, WindowState>();
     for (const item of saved) {
       if (!isWindowState(item)) continue;
-      this.windows.set(item.id, item);
       this.zIndex = Math.max(this.zIndex, item.zIndex);
+      const kept = byApp.get(item.appId);
+      if (!kept || item.zIndex >= kept.zIndex) byApp.set(item.appId, item);
+    }
+    for (const item of byApp.values()) {
+      this.windows.set(item.id, item);
     }
   }
 
@@ -127,6 +143,42 @@ export class WindowService {
 
   get(id: string): WindowState | undefined {
     return this.windows.get(id);
+  }
+
+  /**
+   * 按 appId 查出该应用已打开的窗口。
+   *
+   * 桌面语义是「一个应用一个窗口」：无论窗口处于 normal / minimized / maximized，
+   * 都算该应用已打开。
+   */
+  findByApp(appId: string): WindowState | undefined {
+    for (const win of this.windows.values()) {
+      if (win.appId === appId) return win;
+    }
+    return undefined;
+  }
+
+  /**
+   * 幂等打开应用：已有窗口则聚焦（并从最小化恢复），否则新建。
+   *
+   * 对应 Windows XP 的双击图标行为：已打开的应用再次双击只把窗口带到前台，
+   * 而不是再开一个副本。
+   */
+  openOrFocus(appId: string, params?: Record<string, unknown>): OpenOrFocusResult {
+    const existing = this.findByApp(appId);
+    if (!existing) {
+      return { window: this.open(appId, params), created: true };
+    }
+
+    this.zIndex += 1;
+    const focused: WindowState = {
+      ...existing,
+      mode: existing.mode === 'minimized' ? 'normal' : existing.mode,
+      zIndex: this.zIndex,
+    };
+    this.windows.set(focused.id, focused);
+    this.persist();
+    return { window: focused, created: false };
   }
 
   close(id: string): boolean {

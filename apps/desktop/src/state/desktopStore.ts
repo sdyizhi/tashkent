@@ -144,11 +144,15 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
   /**
    * 打开应用。
    *
+   * 幂等语义（对齐 Windows XP）：该应用已有窗口时聚焦它（并从最小化恢复），
+   * 而不是再开一个副本。幂等由服务端保证（POST 幂等返回同一个窗口 id），
+   * 前端只负责把服务端返回的权威窗口落地，不自行新增窗口。
+   *
    * ADR-004：前端不做乐观更新。先把命令提交给服务端，
    * 等服务端确认（响应载荷 / desktop_window_opened 事件）后再落地本地状态。
    * 只有命令失败（服务端不可达）时才退化为本地窗口，保证离线时桌面仍可用。
    *
-   * @returns 新窗口的 id；命令失败且本地退化时返回本地 id
+   * @returns 窗口的 id；命令失败且本地退化时返回本地 id
    */
   openApp: async (appId, params) => {
     const res = await sendWindowCommand('POST', '/api/desktop/windows', { appId, params });
@@ -156,20 +160,41 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
       // 服务端返回权威窗口对象：按它落地（事件回写是幂等的二次确认）
       if (isWindowState(res.body)) {
         const win = res.body;
-        set((s) => ({
-          windows: s.windows.some((w) => w.id === win.id)
-            ? s.windows.map((w) => (w.id === win.id ? win : w))
-            : [...s.windows, win],
-          focusedId: win.id,
-          nextZIndex: Math.max(s.nextZIndex, win.zIndex),
-        }));
+        set((s) => {
+          // 同一 appId 的本地旧窗口是陈旧副本，被服务端返回的窗口原位取代，
+          // 保持列表顺序稳定（任务栏按钮顺序不随聚焦变化，符合 XP 行为）
+          const index = s.windows.findIndex((w) => w.appId === win.appId);
+          const windows = [...s.windows];
+          if (index >= 0) windows[index] = win;
+          else windows.push(win);
+          return {
+            windows,
+            focusedId: win.id,
+            nextZIndex: Math.max(s.nextZIndex, win.zIndex),
+          };
+        });
         return win.id;
       }
       // 服务端没给出窗口对象：等 desktop_window_opened 事件回写
       return null;
     }
 
-    // 服务端不可达：退化为本地窗口
+    // 服务端不可达：退化为本地窗口（同样遵循幂等：已有则聚焦）
+    const existing = get().windows.find((w) => w.appId === appId);
+    if (existing) {
+      const z = get().nextZIndex + 1;
+      const focused = focusWindow(
+        existing.mode === 'minimized' ? restoreWindow(existing) : existing,
+        z,
+      );
+      set((s) => ({
+        windows: s.windows.map((w) => (w.id === focused.id ? focused : w)),
+        focusedId: focused.id,
+        nextZIndex: z,
+      }));
+      return focused.id;
+    }
+
     const id = nextId();
     const z = get().nextZIndex + 1;
     const offset = (get().windows.length % 6) * 24;
