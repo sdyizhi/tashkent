@@ -9,6 +9,7 @@ import { ToolExecutor } from './agent/tool-executor.js';
 import { AgentRunner } from './agent/runner.js';
 import { createOpenAIProvider } from './agent/providers/openai.js';
 import { createLlmHealthProbe } from './lib/llm-health.js';
+import { logger } from './lib/logger.js';
 import { WindowService } from './services/window-service.js';
 import { AuthzService } from './services/authz-service.js';
 import { createFsTools } from './tools/fs.js';
@@ -100,6 +101,8 @@ export function createRuntime(deps: RuntimeDeps) {
       });
       return decision.allowed;
     },
+    // 工具执行日志（设计文档 7.1）：通过依赖注入传入，不让执行器依赖全局单例
+    logger,
   });
 
   const provider = createOpenAIProvider({
