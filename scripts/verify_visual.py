@@ -77,6 +77,24 @@ async def main():
                 await page.wait_for_timeout(1200)
                 await page.screenshot(path=os.path.join(OUT, '04-files-window.png'))
 
+            # 托盘状态气泡（M6）
+            tray = page.get_by_test_id('tray-icon')
+            if await tray.count() > 0:
+                await tray.click()
+                await page.wait_for_timeout(800)
+                await page.screenshot(path=os.path.join(OUT, '05-tray-bubble.png'))
+                await page.get_by_test_id('bubble-close').click()
+                await page.wait_for_timeout(300)
+
+            # 时钟日历（M6）
+            clock = page.get_by_test_id('clock')
+            if await clock.count() > 0:
+                await clock.dblclick()
+                await page.wait_for_timeout(800)
+                await page.screenshot(path=os.path.join(OUT, '06-calendar.png'))
+                await page.get_by_test_id('calendar-close').click()
+                await page.wait_for_timeout(300)
+
             print('截图完成 ->', OUT)
             print('页面标题:', await page.title())
             await browser.close()

@@ -167,6 +167,29 @@ body {
   color: #fff;
 }
 
+/* 托盘里的图标与时钟：XP 里它们是可点击的 */
+.xp-tray-icon,
+.xp-tray-clock {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-family: var(--xp-font);
+  font-size: var(--xp-font-size);
+  padding: 0 2px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.xp-tray-icon:hover,
+.xp-tray-clock:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.xp-tray-clock {
+  min-width: 44px;
+  text-align: center;
+}
+
 .xp-start-menu {
   position: fixed;
   left: 2px;
@@ -811,6 +834,166 @@ body {
   border: 1px solid var(--xp-border-out);
 }
 
+/* ---- 托盘浮层：日历与状态气泡 ---- */
+
+.xp-tray-popup {
+  position: fixed;
+  right: 4px;
+  bottom: 32px;
+  z-index: 10004;
+  background: var(--xp-face);
+  border: 1px solid var(--xp-border-out);
+  box-shadow: var(--xp-shadow-hard);
+  font-family: var(--xp-font);
+  font-size: var(--xp-font-size);
+}
+
+.xp-calendar {
+  width: 196px;
+}
+
+.xp-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 4px;
+  background: linear-gradient(180deg, var(--xp-blue-start) 0%, var(--xp-blue-end) 100%);
+  color: #fff;
+  font-weight: bold;
+}
+
+.xp-calendar-title { font-size: 11px; }
+
+.xp-calendar-nav {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 2px;
+  background: linear-gradient(180deg, #4a90d9 0%, var(--xp-blue-start) 100%);
+  color: #fff;
+  font-family: var(--xp-font);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.xp-calendar-nav:hover { filter: brightness(1.15); }
+
+.xp-calendar-weekdays,
+.xp-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 3px 4px;
+}
+
+.xp-calendar-weekdays {
+  border-bottom: 1px solid var(--xp-border-out);
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+}
+
+.xp-calendar-weekday {
+  text-align: center;
+  font-weight: bold;
+  color: #333;
+}
+
+.xp-calendar-day {
+  height: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #000;
+}
+
+.xp-calendar-day[data-current-month="false"] { color: #9a9a9a; }
+
+/* 今天高亮：XP 用红底白字 */
+.xp-calendar-day[data-today="true"] {
+  background: #d0342c;
+  color: #fff;
+  font-weight: bold;
+}
+
+.xp-calendar-footer,
+.xp-tray-bubble-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 3px 4px;
+  border-top: 1px solid #aca899;
+  background: var(--xp-face);
+}
+
+.xp-calendar-today-btn,
+.xp-calendar-close-btn {
+  min-width: 48px;
+  height: 19px;
+  padding: 0 8px;
+  border: 1px solid var(--xp-border-out);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #ffffff 0%, var(--xp-face) 100%);
+  color: var(--xp-text);
+  font-family: var(--xp-font);
+  font-size: var(--xp-font-size);
+  cursor: pointer;
+}
+
+.xp-calendar-today-btn:hover,
+.xp-calendar-close-btn:hover { filter: brightness(1.05); }
+
+.xp-calendar-today-btn:disabled {
+  color: #808080;
+  cursor: default;
+  filter: none;
+}
+
+/* ---- 托盘状态气泡 ---- */
+
+.xp-tray-bubble {
+  width: 210px;
+}
+
+.xp-tray-bubble-header {
+  padding: 3px 6px;
+  background: linear-gradient(180deg, var(--xp-blue-start) 0%, var(--xp-blue-end) 100%);
+  color: #fff;
+  font-weight: bold;
+}
+
+.xp-tray-bubble-body {
+  padding: 6px 8px;
+  background: var(--xp-face-light);
+  border: 1px solid var(--xp-border-out);
+  margin: 3px;
+}
+
+.xp-tray-bubble-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.xp-tray-bubble-label { color: #444; }
+
+.xp-tray-bubble-value {
+  font-weight: bold;
+  text-align: right;
+  word-break: break-all;
+}
+
+.xp-tray-bubble-value[data-connected="true"] { color: #1f7a1f; }
+.xp-tray-bubble-value[data-connected="false"] { color: #c0392b; }
+
+.xp-tray-bubble-error {
+  margin-top: 4px;
+  color: #c0392b;
+}
+
 /* ---- XP 动效 ----
  *
  * 所有动画都放在 prefers-reduced-motion: no-preference 之下：
@@ -876,6 +1059,11 @@ body {
     }
   }
 
+  /* 托盘气泡与日历浮层：自下而上滑入 */
+  .xp-tray-popup {
+    animation: xp-menu-in 120ms ease-out;
+  }
+
   /* 任务栏按钮的激活态切换 */
   .xp-taskbar-button {
     transition: background 120ms ease-out, box-shadow 120ms ease-out;
@@ -889,7 +1077,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .xp-window,
   .xp-start-menu,
-  .xp-notification {
+  .xp-notification,
+  .xp-tray-popup {
     animation: none !important;
   }
 
