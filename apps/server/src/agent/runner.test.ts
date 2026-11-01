@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import type { ModelMessage } from 'ai';
 import type { AgentEvent, ToolDefinition } from '@tashkent/shared';
 import { EventBus } from '../lib/event-bus.js';
 import { ToolRegistry } from './tool-registry.js';
 import { ToolExecutor } from './tool-executor.js';
 import { AgentRunner } from './runner.js';
+import type { LLMProvider, LLMRequest } from './provider.js';
 import { scriptedProvider, TEXT_HELLO } from './mock-provider.js';
 
 const agent = {
@@ -47,6 +49,9 @@ describe('AgentRunner', () => {
       executor: new ToolExecutor(registry, { authorize: async () => true }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -68,6 +73,9 @@ describe('AgentRunner', () => {
       executor: new ToolExecutor(registry, { authorize: async () => true }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -96,6 +104,9 @@ describe('AgentRunner', () => {
       executor: new ToolExecutor(registry, { authorize: async () => true }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -112,6 +123,9 @@ describe('AgentRunner', () => {
       executor: new ToolExecutor(registry, { authorize: async () => true }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -126,6 +140,9 @@ describe('AgentRunner', () => {
       executor: new ToolExecutor(registry, { authorize: async () => true }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
     await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
     expect(events.length).toBeGreaterThan(0);
@@ -141,6 +158,9 @@ describe('AgentRunner', () => {
       executor: new ToolExecutor(registry, { authorize: async () => true }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -180,6 +200,9 @@ describe('AgentRunner', () => {
       }),
       bus,
       loadHistory: async () => [],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
     });
 
     const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
@@ -189,5 +212,77 @@ describe('AgentRunner', () => {
     expect(authEvent && authEvent.type === 'authorization_required' && authEvent.authorizationId).toBe('auth-1');
     expect(authEvent && authEvent.type === 'authorization_required' && authEvent.sessionId).toBe('s1');
     expect(authEvent && authEvent.type === 'authorization_required' && authEvent.toolCallId).toBe('c1');
+  });
+
+  it('裁剪历史：只保留最近 N 轮', async () => {
+    let seen: LLMRequest | undefined;
+    const provider: LLMProvider = {
+      async *stream(req) {
+        seen = req;
+        yield { type: 'text-delta', text: 'ok' };
+      },
+    };
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [
+        { id: 'm1', sessionId: 's1', role: 'user', content: '旧问题1', createdAt: 1 },
+        { id: 'm2', sessionId: 's1', role: 'assistant', content: '旧回答1', createdAt: 2 },
+        { id: 'm3', sessionId: 's1', role: 'user', content: '新问题', createdAt: 3 },
+      ],
+      contextKeepTurns: 1,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 8192,
+    });
+
+    await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: '本轮提问' });
+    const contents = (seen?.messages ?? []).map((m) =>
+      m.role === 'system' ? m.content : JSON.stringify(m.content),
+    );
+    expect(contents.some((c) => c.includes('旧问题1'))).toBe(false);
+    expect(contents.some((c) => c.includes('已摘要'))).toBe(true);
+    expect(contents.some((c) => c.includes('新问题'))).toBe(true);
+    expect(contents.some((c) => c.includes('本轮提问'))).toBe(true);
+  });
+
+  it('裁剪历史：超长工具结果被截断', async () => {
+    let seen: LLMRequest | undefined;
+    const provider: LLMProvider = {
+      async *stream(req) {
+        seen = req;
+        yield { type: 'text-delta', text: 'ok' };
+      },
+    };
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, { authorize: async () => true }),
+      bus,
+      loadHistory: async () => [
+        { id: 'm1', sessionId: 's1', role: 'user', content: '读文件', createdAt: 1 },
+        {
+          id: 'm2',
+          sessionId: 's1',
+          role: 'tool',
+          content: 'z'.repeat(5000),
+          toolCallId: 'c1',
+          createdAt: 2,
+        },
+      ],
+      contextKeepTurns: 20,
+      maxInputTokens: 120000,
+      toolResultMaxBytes: 100,
+    });
+
+    await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: '继续' });
+    const toolMsg = (seen?.messages ?? []).find((m) => m.role === 'tool');
+    expect(toolMsg).toBeDefined();
+    const part = (toolMsg as Extract<ModelMessage, { role: 'tool' }>).content[0] as {
+      output: { type: 'text'; value: string };
+    };
+    expect(part.output.value.length).toBeLessThan(200);
+    expect(part.output.value).toContain('已截断');
   });
 });

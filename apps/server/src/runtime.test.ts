@@ -12,6 +12,7 @@ const testConfig: AppConfig = {
   maxSteps: 8,
   maxInputTokens: 120000,
   contextKeepTurns: 20,
+  toolResultMaxBytes: 8192,
   toolTimeoutMs: 30000,
   maxConcurrentRuns: 4,
   allowedDomains: [],

@@ -10,6 +10,8 @@ export interface AppConfig {
   maxSteps: number;
   maxInputTokens: number;
   contextKeepTurns: number;
+  /** 单个工具结果的最大字节数，超出即截断 */
+  toolResultMaxBytes: number;
   toolTimeoutMs: number;
   maxConcurrentRuns: number;
   allowedDomains: string[];
@@ -52,6 +54,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     maxSteps: num(env.MAX_STEPS, 8),
     maxInputTokens: num(env.MAX_INPUT_TOKENS, 120000),
     contextKeepTurns: num(env.CONTEXT_KEEP_TURNS, 20),
+    toolResultMaxBytes: num(env.TOOL_RESULT_MAX_BYTES, 8192),
     toolTimeoutMs: num(env.TOOL_TIMEOUT_MS, 30000),
     maxConcurrentRuns: num(env.MAX_CONCURRENT_RUNS, 4),
     allowedDomains: list(env.ALLOWED_DOMAINS),

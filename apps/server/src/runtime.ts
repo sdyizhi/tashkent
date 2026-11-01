@@ -84,6 +84,9 @@ export function createRuntime(deps: RuntimeDeps) {
     executor,
     bus,
     loadHistory: async (sessionId) => messages.listBySession(sessionId),
+    contextKeepTurns: config.contextKeepTurns,
+    maxInputTokens: config.maxInputTokens,
+    toolResultMaxBytes: config.toolResultMaxBytes,
   });
 
   fs.mkdirSync(path.resolve(config.workspaceDir), { recursive: true });

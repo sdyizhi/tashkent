@@ -4,6 +4,7 @@ import type { EventBus } from '../lib/event-bus.js';
 import type { LLMProvider } from './provider.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ToolExecutor } from './tool-executor.js';
+import { trimMessages } from './context.js';
 
 export interface RunInput {
   sessionId: string;
@@ -26,6 +27,10 @@ export interface RunnerDeps {
   executor: ToolExecutor;
   bus: EventBus;
   loadHistory: (sessionId: string) => Promise<MessageRecord[]>;
+  /** 上下文裁剪参数 */
+  contextKeepTurns: number;
+  maxInputTokens: number;
+  toolResultMaxBytes: number;
 }
 
 /**
@@ -60,7 +65,7 @@ export class AgentRunner {
 
     try {
       const history = await this.deps.loadHistory(input.sessionId);
-      const messages: ModelMessage[] = [
+      const raw: ModelMessage[] = [
         ...history.map(
           (m): ModelMessage =>
             m.role === 'assistant'
@@ -81,6 +86,16 @@ export class AgentRunner {
         ),
         { role: 'user', content: input.userText },
       ];
+
+      // 上下文裁剪：保留最近 N 轮、更早的按摘要压缩、截断超长工具结果、按 token 预算兜底。
+      // raw 的最后一轮是本轮用户提问，必须始终保留，
+      // 因此这里按「N 轮历史 + 当前这轮」计算保留轮数。
+      const { messages } = trimMessages(raw, {
+        keepTurns: this.deps.contextKeepTurns + 1,
+        maxInputTokens: this.deps.maxInputTokens,
+        outputReserveRatio: 0.25,
+        toolResultMaxBytes: this.deps.toolResultMaxBytes,
+      });
 
       const tools = this.deps.registry.pick(input.agent.toolIds);
 
