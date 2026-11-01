@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAgentStream } from '../state/useAgentStream.js';
+import XPDialog from '../components/XPDialog.js';
 
 interface Props {
   sessionId?: string;
@@ -29,6 +30,21 @@ export default function ChatApp({ sessionId }: Props) {
   const [sent, setSent] = useState<ChatMessage[]>([]);
   const stream = useAgentStream(sid ?? null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  /** 已弹出的工具失败提示（对话框） */
+  const [toolFailure, setToolFailure] = useState<{ toolName: string; error: string } | null>(null);
+
+  // 工具执行失败以 XP 风格对话框呈现（设计文档 5.6），而非浏览器默认弹窗。
+  // 同一次失败只弹一次，避免刷屏。
+  const lastReportedFailure = useRef<string | null>(null);
+  useEffect(() => {
+    const failed = stream.toolActivity.find(
+      (t) => t.status === 'failed' && t.summary !== undefined,
+    );
+    if (!failed) return;
+    if (lastReportedFailure.current === failed.toolCallId) return;
+    lastReportedFailure.current = failed.toolCallId;
+    setToolFailure({ toolName: failed.toolName, error: failed.summary ?? '' });
+  }, [stream.toolActivity]);
 
   useEffect(() => {
     if (sid) return;
@@ -128,6 +144,13 @@ export default function ChatApp({ sessionId }: Props) {
           发送
         </button>
       </div>
+      {toolFailure ? (
+        <XPDialog
+          title="工具执行失败"
+          message={`工具「${toolFailure.toolName}」执行失败：${toolFailure.error}`}
+          onClose={() => setToolFailure(null)}
+        />
+      ) : null}
     </div>
   );
 }

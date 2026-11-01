@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useDesktopStore } from '../state/desktopStore.js';
+import { useErrorStore } from '../state/errorStore.js';
 import XPTaskbarButton from '../components/XPTaskbarButton.js';
 
 export default function Taskbar() {
@@ -11,6 +12,10 @@ export default function Taskbar() {
   const startMenuOpen = useDesktopStore((s) => s.startMenuOpen);
   const setStartMenuOpen = useDesktopStore((s) => s.setStartMenuOpen);
   const [now, setNow] = useState(() => new Date());
+
+  // 未捕获异常的数量 → 托盘红点（设计文档 5.6）
+  const errorCount = useErrorStore((s) => s.errors.length);
+  const clearError = useErrorStore((s) => s.clearError);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -42,6 +47,23 @@ export default function Taskbar() {
         />
       ))}
       <div className="xp-tray">
+        {errorCount > 0 ? (
+          <button
+            type="button"
+            className="xp-tray-error"
+            data-testid="tray-error-badge"
+            aria-label={`${errorCount} 个未处理的错误`}
+            title={useErrorStore.getState()
+              .errors.map((e) => e.message)
+              .join('\n')}
+            onClick={() => {
+              for (const e of useErrorStore.getState().errors) clearError(e.id);
+            }}
+          >
+            <span aria-hidden="true">❗</span>
+            <span data-testid="tray-error-count">{errorCount}</span>
+          </button>
+        ) : null}
         <span aria-hidden="true">🔊</span>
         <span data-testid="clock">{clock}</span>
       </div>

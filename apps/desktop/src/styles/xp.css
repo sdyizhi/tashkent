@@ -318,6 +318,49 @@ body {
   font-weight: bold;
 }
 
+/* ---- 错误边界降级面板 ---- */
+
+.xp-error-boundary {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 120px;
+  background: var(--xp-face);
+}
+
+.xp-error-boundary-body {
+  flex: 1;
+  padding: 10px 12px;
+  background: var(--xp-face-light);
+  border: 1px solid var(--xp-border-out);
+  margin: 3px;
+  font-size: var(--xp-font-size);
+  line-height: 1.5;
+  overflow: auto;
+}
+
+.xp-error-boundary-message { margin-bottom: 8px; }
+
+/* ---- 托盘未处理异常红点 ---- */
+
+.xp-tray-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 5px;
+  border: 1px solid #ffd0d0;
+  border-radius: 9px;
+  background: #d0342c;
+  color: #fff;
+  font-family: var(--xp-font);
+  font-size: 10px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.xp-tray-error:hover { filter: brightness(1.1); }
+
 /* ---- 桌面通知气泡 ---- */
 
 .xp-notifications {

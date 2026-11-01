@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useDesktopStore } from '../state/desktopStore.js';
 import { useDesktopEvents } from '../state/useDesktopEvents.js';
 import { useAuthorizationStore } from '../state/authorizationStore.js';
+import { setupUnhandledRejectionCapture } from '../state/unhandledRejection.js';
 import Wallpaper from './Wallpaper.js';
 import DesktopIcons from './DesktopIcons.js';
 import WindowLayer from './WindowLayer.js';
@@ -59,6 +60,9 @@ export default function DesktopRoot() {
     window.addEventListener('contextmenu', onContextMenu);
     return () => window.removeEventListener('contextmenu', onContextMenu);
   }, [setStartMenuOpen]);
+
+  // 全局未捕获的 Promise rejection → 托盘红点提示（设计文档 5.6）
+  useEffect(() => setupUnhandledRejectionCapture(), []);
 
   const decideAuthorization = async (approved: boolean, remember: boolean) => {
     const request = useAuthorizationStore.getState().request;
