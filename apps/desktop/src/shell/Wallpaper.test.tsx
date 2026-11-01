@@ -48,6 +48,45 @@ describe('Wallpaper Bliss 壁纸', () => {
     view.unmount();
   });
 
+  it('渲染两朵积云：左上一朵大的、右侧一朵小的', () => {
+    const view = render();
+    const clouds = view.container.querySelectorAll('.xp-cloud');
+    expect(clouds.length).toBe(2);
+    expect(view.container.querySelector('[data-testid="wallpaper-cloud-large"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-testid="wallpaper-cloud-small"]')).not.toBeNull();
+    view.unmount();
+  });
+
+  it('每朵云由多个椭圆团块叠成（而不是一整块渐变）', () => {
+    const view = render();
+    const large = view.container.querySelector('[data-testid="wallpaper-cloud-large"]')!;
+    const small = view.container.querySelector('[data-testid="wallpaper-cloud-small"]')!;
+    // 团块数量下限：太少就退化成一块糊开的渐变
+    expect(large.querySelectorAll('.xp-puff').length).toBeGreaterThanOrEqual(6);
+    expect(small.querySelectorAll('.xp-puff').length).toBeGreaterThanOrEqual(5);
+    view.unmount();
+  });
+
+  it('每朵云只有一块平底底盘，底缘是水平直线', () => {
+    const view = render();
+    const large = view.container.querySelector('[data-testid="wallpaper-cloud-large"]')!;
+    // 底盘负责 XP Bliss 最标志性的平底；两块并排会在接缝处留下台阶缺口
+    expect(large.querySelectorAll('.xp-puff--base').length).toBe(1);
+    expect(large.querySelectorAll('.xp-puff--crown').length).toBeGreaterThanOrEqual(1);
+    view.unmount();
+  });
+
+  it('云团块边缘锐利：靠 border-radius 硬切，不用模糊', () => {
+    const puffRule = xpCss.slice(
+      xpCss.indexOf('.xp-puff {'),
+      xpCss.indexOf('.xp-puff--base'),
+    );
+    expect(puffRule).toMatch(/border-radius:\s*50%/);
+    // 羽化（blur / 渐变羽化）会让云糊成灰白污渍，是这次要修掉的旧问题
+    expect(puffRule).not.toMatch(/filter:\s*blur/);
+    expect(puffRule).not.toMatch(/backdrop-filter/);
+  });
+
   it('壁纸层覆盖任务栏以外的全部桌面区域', () => {
     // 壁纸底边要留给 30px 的任务栏
     expect(xpCss).toMatch(/\.xp-wallpaper\s*\{[^}]*inset:\s*0 0 30px 0/);

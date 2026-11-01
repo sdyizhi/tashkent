@@ -316,33 +316,142 @@ body {
   background: #3f7fd0;
 }
 
-/* 天空：上深下浅的蓝色渐变 + 两团柔和的白云 */
+/* 天空：上深下浅的蓝色渐变。云的形状完全交给 .xp-wallpaper-cloud，这里只铺底色。 */
 .xp-wallpaper-sky {
   position: absolute;
   inset: 0;
-  background:
-    /* 左上角的大朵积云：几个交叠的椭圆团 */
-    radial-gradient(ellipse 20% 12% at 17% 13%, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 70%),
-    radial-gradient(ellipse 15% 9% at 25% 15%, rgba(255, 255, 255, 0.88) 0%, rgba(255, 255, 255, 0) 70%),
-    radial-gradient(ellipse 13% 7% at 9% 16%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 72%),
-    /* 右上方的云团 */
-    radial-gradient(ellipse 17% 10% at 68% 10%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 70%),
-    radial-gradient(ellipse 12% 7% at 76% 13%, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0) 72%),
-    linear-gradient(180deg, #1b4a9c 0%, #3f7fd0 42%, #86b6e8 74%, #cfe3f5 100%);
+  background: linear-gradient(180deg, #1b4a9c 0%, #3f7fd0 42%, #86b6e8 74%, #cfe3f5 100%);
 }
 
-/* 高空的薄云：横向拉长的白色带 */
+/*
+ * 云层。
+ *
+ * 结构：.xp-wallpaper-cloud 是铺满天空的容器（自身不绘制任何形状），
+ * 里面放两朵 .xp-cloud，每朵由若干 .xp-puff 椭圆团块叠加而成。
+ *
+ * 关键点：
+ *  - 团块用 border-radius:50% 的实心元素，轮廓硬切，边缘锐利（不做羽化）；
+ *  - 不用 filter: blur()，边缘靠几何而非模糊获得。
+ */
 .xp-wallpaper-cloud {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 4%;
-  height: 24%;
-  background:
-    radial-gradient(ellipse 14% 40% at 48% 44%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 72%),
-    radial-gradient(ellipse 9% 30% at 88% 66%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 72%);
+  inset: 0;
   pointer-events: none;
+  overflow: hidden;
 }
+
+.xp-cloud {
+  position: absolute;
+  /*
+   * 对整朵云的合成轮廓投一次影子，让云从天空里「浮」起来。
+   * drop-shadow 只复制轮廓并偏移，不会软化云自身的边缘。
+   */
+  filter: drop-shadow(0 4px 5px rgba(30, 60, 112, 0.22));
+}
+
+/*
+ * 团块（云的基本单元）。
+ *
+ * 边缘由 border-radius:50% 硬切，因此轮廓锐利，绝不做羽化。
+ *
+ * 团块自身不带投影 —— 每个团块各拖一道影子的话，下缘全是深色弧线，
+ * 整朵云看起来像一摞叠起来的硬币。深度感来自两处：
+ *  - 偏心的径向渐变：高光在左上、灰调沉在右下，读起来是一个球面；
+ *  - 整朵云由 .xp-cloud 的 drop-shadow 一次性投到天空上。
+ */
+.xp-puff {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 38% 22%,
+    #ffffff 0%,
+    #ffffff 44%,
+    #f6f9fd 72%,
+    #e8eef7 90%,
+    #dae3ef 100%
+  );
+}
+
+/*
+ * 云底：积云背光的一面。
+ * 用 border-radius 的八值语法把底部两个角压成 0 —— 上半是饱满的穹顶，
+ * 下缘是一条近水平的直线，这是 XP Bliss 云朵最关键的特征。
+ * 每朵云只有一块底盘：两块并排会在接缝处留下台阶状缺口。
+ *
+ * 灰调要压在最下面：底盘大半被白色团块盖住，只露出下缘一条，
+ * 云底才像「被光照亮的云的底面」，而不是压在云下面的一块灰板。
+ */
+.xp-puff--base {
+  border-radius: 50% 50% 0 0 / 96% 96% 0 0;
+  background: linear-gradient(180deg, #ffffff 0%, #ffffff 52%, #f2f6fb 70%, #dee7f2 86%, #c9d5e7 100%);
+}
+
+/* 云冠：最高处的团块，几乎全白 */
+.xp-puff--crown {
+  background: radial-gradient(
+    circle at 36% 20%,
+    #ffffff 0%,
+    #ffffff 62%,
+    #fbfdff 84%,
+    #f2f7fc 100%
+  );
+}
+
+/*
+ * ---- 左上方的大朵积云 ----
+ *
+ * 结构：一块平底穹顶（base）托住一排气丘状团块（body），
+ * 最高处再叠两块纯白云冠（crown）。
+ * 底缘因此是一条近水平的直线，顶部轮廓则是起伏的扇贝边 —— XP Bliss 的两个特征。
+ *
+ * 注意：width 的百分比按容器宽算、height 的百分比按容器高算，
+ * 容器宽高比约 2 : 1，所以「圆」的 width : height 要取 15% : 34% 左右，
+ * 而不是 1 : 1 —— 否则团块会被拉成竖长的椭圆。
+ *
+ * 位置下移到图标行之下，避免与左上角桌面图标抢视觉。
+ */
+.xp-cloud--large {
+  left: 4%;
+  top: 9%;
+  width: 31%;
+  height: 21%;
+}
+
+/* 底盘：单一穹顶，底缘齐平，左右与团块列对齐 */
+.xp-puff--l0 { left: 2%; top: 46%; width: 96%; height: 54%; }
+/* 主体：一排大小不一的圆丘，重叠后连成起伏的扇贝边；下缘嵌入底盘 */
+.xp-puff--l1 { left: 0%;   top: 52%; width: 13%; height: 30%; }
+.xp-puff--l2 { left: 9%;   top: 44%; width: 12%; height: 28%; }
+.xp-puff--l3 { left: 18%;  top: 36%; width: 13%; height: 30%; }
+.xp-puff--l4 { left: 28%;  top: 29%; width: 12%; height: 28%; }
+.xp-puff--l5 { left: 38%;  top: 25%; width: 13%; height: 30%; }
+.xp-puff--l6 { left: 49%;  top: 31%; width: 12%; height: 28%; }
+.xp-puff--l7 { left: 59%;  top: 39%; width: 12%; height: 28%; }
+.xp-puff--l8 { left: 68%;  top: 46%; width: 13%; height: 30%; }
+.xp-puff--l9 { left: 78%;  top: 52%; width: 14%; height: 30%; }
+/* 云冠：纯白，抬在最高处 */
+.xp-puff--l10 { left: 25%; top: 18%; width: 11%; height: 25%; }
+.xp-puff--l11 { left: 37%; top: 14%; width: 12%; height: 27%; }
+
+/* ---- 右侧的中等云：更小、更高 ---- */
+.xp-cloud--small {
+  left: 68%;
+  top: 8%;
+  width: 19%;
+  height: 15%;
+}
+
+.xp-puff--s0 { left: 2%;  top: 46%; width: 96%; height: 54%; }
+.xp-puff--s1 { left: 0%;  top: 48%; width: 16%; height: 36%; }
+.xp-puff--s2 { left: 11%; top: 39%; width: 15%; height: 34%; }
+.xp-puff--s3 { left: 24%; top: 31%; width: 16%; height: 36%; }
+.xp-puff--s4 { left: 38%; top: 28%; width: 16%; height: 36%; }
+.xp-puff--s5 { left: 52%; top: 34%; width: 15%; height: 34%; }
+.xp-puff--s6 { left: 65%; top: 42%; width: 16%; height: 36%; }
+.xp-puff--s7 { left: 78%; top: 49%; width: 17%; height: 36%; }
+/* 云冠 */
+.xp-puff--s8 { left: 31%; top: 12%; width: 14%; height: 30%; }
 
 /* 绿丘：椭圆上凸的草坡，近处更暗更饱和 */
 .xp-wallpaper-hill {

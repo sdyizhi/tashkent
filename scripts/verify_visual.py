@@ -22,6 +22,18 @@ def wait(url, timeout=30):
     return False
 
 
+async def close_all_windows(page):
+    """清空服务端持久化的窗口列表，让桌面截图回到「刚开机」的状态。"""
+    try:
+        res = await page.request.get('http://localhost:8080/api/desktop/windows')
+        body = await res.json()
+        for w in body.get('windows', []):
+            await page.request.delete(
+                f"http://localhost:8080/api/desktop/windows/{w['id']}")
+    except Exception as e:
+        print('清空窗口列表失败（可忽略）:', e)
+
+
 async def main():
     server = subprocess.Popen(
         [sys.executable, '-c',
@@ -43,10 +55,15 @@ async def main():
             print('后端未就绪')
             return
 
+        # 窗口列表持久化在 SQLite 里，上一轮脚本打开的窗口会在这一轮恢复，
+        # 污染桌面截图。这里先清空，保证每次截的都是「干净桌面」。
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page(viewport={"width": 1280, "height": 800},
                                           device_scale_factor=2)
+
+            await close_all_windows(page)
+
             # SSE 长连接会让 networkidle 永不触发，改用 domcontentloaded
             await page.goto('http://localhost:8080/', wait_until='domcontentloaded')
             await page.wait_for_timeout(3000)
