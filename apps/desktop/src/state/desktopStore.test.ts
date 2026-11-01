@@ -168,3 +168,88 @@ describe('desktopStore 窗口命令（服务端为权威源）', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('desktopStore 桌面状态持久化', () => {
+  beforeEach(() => {
+    useDesktopStore.setState({ windows: [], icons: [], focusedId: null, nextZIndex: 10 });
+    vi.restoreAllMocks();
+  });
+  it('persist 把图标与窗口几何写入 /api/desktop/state', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"ok":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.setState({
+      icons: [{ appId: 'chat', title: '对话', icon: '💬', x: 0, y: 0 }],
+    });
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1', { x: 33, y: 44 }));
+
+    await useDesktopStore.getState().persist();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/desktop/state');
+    expect(init.method).toBe('PUT');
+    const body = JSON.parse(String(init.body)) as {
+      key: string;
+      value: { icons: unknown[]; windows: Array<{ appId: string; x: number }> };
+    };
+    expect(body.key).toBe('desktop');
+    expect(body.value.icons).toHaveLength(1);
+    expect(body.value.windows[0]?.appId).toBe('chat');
+    expect(body.value.windows[0]?.x).toBe(33);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('restore 从服务端读回图标位置', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            key: 'desktop',
+            value: {
+              icons: [{ appId: 'chat', title: '对话', icon: '💬', x: 12, y: 34 }],
+              windows: [],
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await useDesktopStore.getState().restoreLayout();
+
+    const icons = useDesktopStore.getState().icons;
+    expect(icons).toHaveLength(1);
+    expect(icons[0]?.x).toBe(12);
+    expect(icons[0]?.y).toBe(34);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('restore 在服务端无数据时保持现状', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"key":"desktop","value":null}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.setState({
+      icons: [{ appId: 'files', title: '我的文档', icon: '📁', x: 0, y: 0 }],
+    });
+    await useDesktopStore.getState().restoreLayout();
+
+    expect(useDesktopStore.getState().icons).toHaveLength(1);
+    expect(useDesktopStore.getState().icons[0]?.appId).toBe('files');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('restore 请求失败时静默忽略', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(useDesktopStore.getState().restoreLayout()).resolves.toBeUndefined();
+
+    vi.unstubAllGlobals();
+  });
+});

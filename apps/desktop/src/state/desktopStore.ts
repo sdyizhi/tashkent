@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import type { WindowState } from '@tashkent/shared';
 import {
   closeWindow,
@@ -18,6 +18,20 @@ export interface DesktopIcon {
   icon: string;
   x: number;
   y: number;
+}
+
+export interface PersistedWindow {
+  appId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  mode: 'normal' | 'minimized' | 'maximized';
+}
+
+export interface DesktopPersisted {
+  icons?: DesktopIcon[];
+  windows?: PersistedWindow[];
 }
 
 interface DesktopStore {
@@ -45,6 +59,10 @@ interface DesktopStore {
   patchRemoteWindow: (id: string, patch: Partial<WindowState>) => void;
   /** 移除服务端广播已关闭的窗口 */
   removeRemoteWindow: (id: string) => void;
+  /** 把桌面布局写入服务端 */
+  persist: () => Promise<void>;
+  /** 从服务端恢复桌面布局（与窗口的 restore(id) 区分） */
+  restoreLayout: () => Promise<void>;
 }
 
 let idCounter = 0;
@@ -211,6 +229,52 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
       };
     }),
 
+  persist: async () => {
+    const s = get();
+    try {
+      await fetch('/api/desktop/state', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key: 'desktop',
+          value: {
+            icons: s.icons,
+            windows: s.windows.map((w) => ({
+              appId: w.appId,
+              x: w.x,
+              y: w.y,
+              width: w.width,
+              height: w.height,
+              mode: w.mode,
+            })),
+          } satisfies DesktopPersisted,
+        }),
+      });
+    } catch {
+      // 持久化失败不影响桌面使用
+    }
+  },
+
+  /**
+   * 从服务端恢复桌面布局。
+   *
+   * 只恢复图标布局：窗口状态由服务端 WindowService 持有权威（ADR-004），
+   * 前端启动时从 GET /api/desktop/windows 取快照恢复，不走这里的持久化数据，
+   * 否则会与服务端权威状态冲突。
+   */
+  restoreLayout: async () => {
+    try {
+      const res = await fetch('/api/desktop/state?key=desktop');
+      if (!res.ok) return;
+      const body = (await res.json()) as { value: DesktopPersisted | null };
+      if (!body.value) return;
+      set((s) => ({
+        icons: body.value?.icons ?? s.icons,
+      }));
+    } catch {
+      // 恢复失败时使用默认桌面
+    }
+  },
 }));
 
 export const selectFocusedWindow = (s: DesktopStore): WindowState | null =>

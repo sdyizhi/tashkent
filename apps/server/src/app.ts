@@ -5,6 +5,7 @@ import { sessionRoutes } from './routes/sessions.js';
 import { toolRoutes } from './routes/tools.js';
 import { eventRoutes } from './routes/events.js';
 import { desktopRoutes } from './routes/desktop.js';
+import { desktopStateRoutes } from './routes/desktop-state.js';
 import type { Runtime } from './runtime.js';
 
 export function createApp(rt: Runtime) {
@@ -43,6 +44,7 @@ export function createApp(rt: Runtime) {
     }),
   );
   app.route('/', desktopRoutes(rt.windowService, (event) => rt.bus.publish(event)));
+  app.route('/', desktopStateRoutes(rt.desktopState));
 
   app.notFound((c) => c.json({ error: { code: 'NOT_FOUND', message: '资源不存在' } }, 404));
   app.onError((err, c) => {

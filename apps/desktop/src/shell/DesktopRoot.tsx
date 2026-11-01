@@ -19,15 +19,36 @@ const DEFAULT_ICONS = [
 export default function DesktopRoot() {
   const setIcons = useDesktopStore((s) => s.setIcons);
   const setStartMenuOpen = useDesktopStore((s) => s.setStartMenuOpen);
+  const persist = useDesktopStore((s) => s.persist);
+  const restoreLayout = useDesktopStore((s) => s.restoreLayout);
+  const windows = useDesktopStore((s) => s.windows);
+  const icons = useDesktopStore((s) => s.icons);
 
   const { notifications, dismissNotification } = useDesktopEvents();
 
   const authRequest = useAuthorizationStore((s) => s.request);
   const clearRequest = useAuthorizationStore((s) => s.clearRequest);
 
+  // 从服务端恢复桌面布局；服务端没有记录时用默认图标兜底
   useEffect(() => {
-    setIcons(DEFAULT_ICONS);
-  }, [setIcons]);
+    let cancelled = false;
+    void (async () => {
+      await restoreLayout();
+      if (cancelled) return;
+      const restored = useDesktopStore.getState().icons;
+      if (restored.length === 0) setIcons(DEFAULT_ICONS);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreLayout, setIcons]);
+
+  // 桌面状态变化后持久化到服务端（去抖，避免拖拽时高频写入）
+  useEffect(() => {
+    if (icons.length === 0) return;
+    const timer = setTimeout(() => void persist(), 300);
+    return () => clearTimeout(timer);
+  }, [icons, windows, persist]);
 
   useEffect(() => {
     const onContextMenu = (e: MouseEvent) => {
