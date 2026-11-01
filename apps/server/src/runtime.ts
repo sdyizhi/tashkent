@@ -53,8 +53,22 @@ export function createRuntime(deps: RuntimeDeps) {
 
   const authz = new AuthzService();
   const executor = new ToolExecutor(toolRegistry, {
-    authorize: async (tool) => {
-      const decision = await authz.request(tool);
+    authorize: async (tool, info) => {
+      const decision = await authz.request(tool, ({ authorizationId }) => {
+        // 通知前端弹出授权对话框；工具在此挂起，直到用户作出决策
+        info.emit({
+          type: 'authorization_required',
+          sessionId: info.sessionId,
+          authorizationId,
+          toolCallId: info.toolCallId,
+          toolName: tool.name,
+          args: info.args,
+          reason:
+            tool.permission === 'dangerous'
+              ? `危险工具「${tool.name}」需要确认后才能执行`
+              : `工具「${tool.name}」将修改文件或创建内容，需要确认`,
+        });
+      });
       return decision.allowed;
     },
   });

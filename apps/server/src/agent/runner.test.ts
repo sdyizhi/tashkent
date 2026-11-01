@@ -148,4 +148,46 @@ describe('AgentRunner', () => {
     const errEvent = result.events.find((e) => e.type === 'run_error');
     expect(errEvent && errEvent.type === 'run_error' && errEvent.message).toBe('连接超时');
   });
+
+  it('write 工具触发授权时发出 authorization_required 事件', async () => {
+    registry.register({
+      name: 'writer',
+      description: '写文件',
+      inputSchema: z.object({ path: z.string() }),
+      permission: 'write',
+      execute: async () => ({ ok: true }),
+    });
+    const provider = scriptedProvider([
+      [{ type: 'tool-call', toolCallId: 'c1', toolName: 'writer', args: { path: 'a.txt' } }],
+    ]);
+    const runner = new AgentRunner({
+      provider,
+      registry,
+      executor: new ToolExecutor(registry, {
+        authorize: async (_tool, info) => {
+          // 模拟 runtime 层：发授权事件后等待前端决策
+          info.emit({
+            type: 'authorization_required',
+            sessionId: info.sessionId,
+            authorizationId: 'auth-1',
+            toolCallId: info.toolCallId,
+            toolName: 'writer',
+            args: info.args,
+            reason: '需要用户授权',
+          });
+          return true;
+        },
+      }),
+      bus,
+      loadHistory: async () => [],
+    });
+
+    const result = await runner.run({ sessionId: 's1', agentId: 'chat', agent, userText: 'hi' });
+    const authEvent = result.events.find((e) => e.type === 'authorization_required');
+    expect(authEvent).toBeTruthy();
+    expect(authEvent && authEvent.type === 'authorization_required' && authEvent.toolName).toBe('writer');
+    expect(authEvent && authEvent.type === 'authorization_required' && authEvent.authorizationId).toBe('auth-1');
+    expect(authEvent && authEvent.type === 'authorization_required' && authEvent.sessionId).toBe('s1');
+    expect(authEvent && authEvent.type === 'authorization_required' && authEvent.toolCallId).toBe('c1');
+  });
 });

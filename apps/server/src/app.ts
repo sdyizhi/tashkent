@@ -20,7 +20,7 @@ export function createApp(rt: Runtime) {
     }),
   );
   app.route('/', agentRoutes(rt.registry));
-  app.route('/', toolRoutes(rt.toolRegistry));
+  app.route('/', toolRoutes(rt.toolRegistry, rt.authz));
   app.route('/', eventRoutes(rt.bus));
   app.route(
     '/',

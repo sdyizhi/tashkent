@@ -73,6 +73,52 @@ describe('ToolExecutor', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it('write 工具在授权通过后执行', async () => {
+    const spy = vi.fn(async () => ({ ok: true, summary: '写好了' }));
+    registry.register({ ...safeTool(), name: 'write.tool', permission: 'write', execute: spy });
+    const ex = new ToolExecutor(registry, { authorize: async () => true });
+    const res = await ex.execute('write.tool', {}, { sessionId: 's1', agentId: 'a1', toolCallId: 't1', emit: () => {} });
+    expect(res.ok).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('safe 工具不触发授权回调', async () => {
+    const spy = vi.fn(async () => true);
+    registry.register(safeTool());
+    const ex = new ToolExecutor(registry, { authorize: spy });
+    await ex.execute('safe.tool', {}, { sessionId: 's1', agentId: 'a1', toolCallId: 't1', emit: () => {} });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('授权回调拿到 sessionId / toolCallId / args', async () => {
+    const seen: Array<{ sessionId: string; toolCallId: string; args: unknown }> = [];
+    registry.register({ ...safeTool(), name: 'write.tool', permission: 'write' });
+    const ex = new ToolExecutor(registry, {
+      authorize: async (_tool, info) => {
+        seen.push({ sessionId: info.sessionId, toolCallId: info.toolCallId, args: info.args });
+        return true;
+      },
+    });
+    await ex.execute('write.tool', { path: 'a.txt' }, { sessionId: 's9', agentId: 'a1', toolCallId: 'tc-7', emit: () => {} });
+    expect(seen).toEqual([{ sessionId: 's9', toolCallId: 'tc-7', args: { path: 'a.txt' } }]);
+  });
+
+  it('授权挂起期间工具尚未执行，授权通过后才执行', async () => {
+    const spy = vi.fn(async () => ({ ok: true }));
+    registry.register({ ...safeTool(), name: 'write.tool', permission: 'write', execute: spy });
+    let approve!: (ok: boolean) => void;
+    const ex = new ToolExecutor(registry, {
+      authorize: () => new Promise<boolean>((r) => (approve = r)),
+    });
+    const pending = ex.execute('write.tool', {}, { sessionId: 's1', agentId: 'a1', toolCallId: 't1', emit: () => {} });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(spy).not.toHaveBeenCalled();
+    approve(true);
+    const res = await pending;
+    expect(res.ok).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it('未注册的工具返回错误', async () => {
     const ex = new ToolExecutor(registry, { authorize: async () => true });
     const res = await ex.execute('ghost', {}, { sessionId: 's1', agentId: 'a1', toolCallId: 't1', emit: () => {} });
