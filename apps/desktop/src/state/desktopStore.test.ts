@@ -334,6 +334,33 @@ describe('desktopStore 窗口命令不做乐观更新（ADR-004）', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('close 在服务端返回 404（窗口已不存在）时也清掉本地窗口', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"error":"gone"}', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    await useDesktopStore.getState().close('srv-1');
+
+    // 服务端是权威源：窗口已不存在，本地不应留下幽灵窗口
+    expect(useDesktopStore.getState().windows).toHaveLength(0);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('close 在服务端不可达时保留本地窗口', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('network down');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    useDesktopStore.getState().upsertRemoteWindow(remoteWindow('srv-1'));
+    await useDesktopStore.getState().close('srv-1');
+
+    expect(useDesktopStore.getState().windows).toHaveLength(1);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('desktopStore 桌面状态持久化', () => {

@@ -14,7 +14,8 @@ export default function Taskbar() {
   const [now, setNow] = useState(() => new Date());
 
   // 未捕获异常的数量 → 托盘红点（设计文档 5.6）
-  const errorCount = useErrorStore((s) => s.errors.length);
+  const errors = useErrorStore((s) => s.errors);
+  const errorCount = errors.length;
   const clearError = useErrorStore((s) => s.clearError);
 
   useEffect(() => {
@@ -53,11 +54,9 @@ export default function Taskbar() {
             className="xp-tray-error"
             data-testid="tray-error-badge"
             aria-label={`${errorCount} 个未处理的错误`}
-            title={useErrorStore.getState()
-              .errors.map((e) => e.message)
-              .join('\n')}
+            title={errors.map((e) => e.message).join('\n')}
             onClick={() => {
-              for (const e of useErrorStore.getState().errors) clearError(e.id);
+              for (const e of errors) clearError(e.id);
             }}
           >
             <span aria-hidden="true">❗</span>

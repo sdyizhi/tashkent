@@ -77,6 +77,8 @@ function nextId(): string {
 interface CommandResult {
   ok: boolean;
   body: unknown;
+  /** HTTP 状态码；请求失败时为 0 */
+  status: number;
 }
 
 /**
@@ -96,16 +98,16 @@ async function sendWindowCommand(
       headers: { 'content-type': 'application/json' },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
-    if (!res.ok) return { ok: false, body: null };
+    if (!res.ok) return { ok: false, body: null, status: res.status };
     let payload: unknown = null;
     try {
       payload = await res.json();
     } catch {
       payload = null;
     }
-    return { ok: true, body: payload };
+    return { ok: true, body: payload, status: res.status };
   } catch {
-    return { ok: false, body: null };
+    return { ok: false, body: null, status: 0 };
   }
 }
 
@@ -191,10 +193,12 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
    *
    * 先提交命令，服务端确认后再移除本地窗口；
    * 服务端随后广播的 desktop_window_closed 事件是幂等的二次确认。
+   * 服务端返回 404 表示窗口已不存在（服务端才是权威），此时本地也要清掉，
+   * 否则窗口会永远卡在桌面上。
    */
   close: async (id) => {
     const res = await sendWindowCommand('DELETE', `/api/desktop/windows/${id}`);
-    if (!res.ok) return; // 服务端未确认，本地保持原样
+    if (!res.ok && res.status !== 404) return; // 服务端未确认，本地保持原样
     set((s) => ({
       windows: s.windows.filter((w) => w.id !== id),
       focusedId: s.focusedId === id ? null : s.focusedId,
