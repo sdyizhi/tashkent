@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { WindowState } from '@tashkent/shared';
+import { APP_REGISTRY, type WindowState } from '@tashkent/shared';
 import type { AppConfig } from './lib/config.js';
 import { EventBus } from './lib/event-bus.js';
 import { AgentRegistry } from './agent/registry.js';
@@ -58,10 +58,14 @@ export function createRuntime(deps: RuntimeDeps) {
 
   const toolRegistry = new ToolRegistry();
   const windowService = new WindowService({
-    apps: [
-      { appId: 'chat', title: '对话', icon: '💬' },
-      { appId: 'files', title: '我的文档', icon: '📁', width: 520, height: 400 },
-    ],
+    // 应用元信息统一来自共享注册表，避免前后端各写一份而漂移
+    apps: APP_REGISTRY.map((a) => ({
+      appId: a.appId,
+      title: a.title,
+      icon: a.icon,
+      width: a.width,
+      height: a.height,
+    })),
     defaultWidth: 640,
     defaultHeight: 480,
     persistence: {
