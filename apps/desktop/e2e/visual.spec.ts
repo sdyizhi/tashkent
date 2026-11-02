@@ -20,6 +20,13 @@ const desktopMask = (page: import('@playwright/test').Page) => [page.getByTestId
 const maskColor = '#808080';
 
 test.describe('视觉回归', () => {
+  // 基线在 Windows 上生成（XP 字体栈 Tahoma 渲染），Linux CI 的字体渲染不同，
+  // 像素对比必然超阈值。视觉回归是本地开发回归用的，CI 上跳过。
+  test.skip(
+    process.env.CI === 'true',
+    '视觉基线依赖字体渲染，与 CI 的 Linux 环境不兼容（基线在 Windows 生成）',
+  );
+
   test('桌面视觉基线', async ({ page }) => {
     await page.goto('/');
     // 等待应用注册表拉取完成、桌面图标渲染出来
