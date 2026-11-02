@@ -4,6 +4,7 @@ import type { EventBus } from '../lib/event-bus.js';
 import type { LLMProvider } from './provider.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { ToolExecutor } from './tool-executor.js';
+import type { MetricsRegistry } from '../lib/metrics.js';
 import { trimMessages } from './context.js';
 
 export interface RunInput {
@@ -33,6 +34,8 @@ export interface RunnerDeps {
   toolResultMaxBytes: number;
   /** 单次运行的工具调用轮数上限（agent 可用 maxSteps 覆盖） */
   maxSteps: number;
+  /** 指标收集器（设计文档 7.3）；未注入时不埋点 */
+  metrics?: MetricsRegistry;
 }
 
 /**
@@ -177,6 +180,8 @@ export class AgentRunner {
 
     if (error) {
       emit({ type: 'run_error', sessionId: input.sessionId, message: error });
+      this.deps.metrics?.runsTotal('error');
+      this.recordTokens(usage);
       return { text, toolCalls, usage, error, events };
     }
 
@@ -186,6 +191,15 @@ export class AgentRunner {
       reason: 'stop',
       usage,
     });
+    this.deps.metrics?.runsTotal('ok');
+    this.recordTokens(usage);
     return { text, toolCalls, usage, events };
+  }
+
+  /** 把本次运行的 token 用量记入指标 */
+  private recordTokens(usage: RunResult['usage']): void {
+    if (!this.deps.metrics || !usage) return;
+    this.deps.metrics.llmTokens('input', usage.inputTokens);
+    this.deps.metrics.llmTokens('output', usage.outputTokens);
   }
 }

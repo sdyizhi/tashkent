@@ -1,6 +1,7 @@
 import type { AgentEvent, ToolContext, ToolDefinition, ToolResult } from '@tashkent/shared';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Logger } from '../lib/logger.js';
+import type { MetricsRegistry } from '../lib/metrics.js';
 
 /** 发起授权请求时需要携带的上下文 */
 export interface AuthorizationInfo {
@@ -22,6 +23,8 @@ export interface ExecutorDeps {
    * 通过依赖注入传入，保持依赖倒置：执行器不认识全局 logger 单例。
    */
   logger?: Logger;
+  /** 指标收集器（设计文档 7.3）；未注入时不埋点 */
+  metrics?: MetricsRegistry;
 }
 
 /** 工具执行日志的公共字段 */
@@ -68,6 +71,8 @@ export class ToolExecutor {
         ok: false,
         error,
       });
+      this.deps.metrics?.toolCalls(name, false);
+      this.deps.metrics?.toolDuration(name, Date.now() - startedAt);
       return { ok: false, error };
     }
 
@@ -87,6 +92,8 @@ export class ToolExecutor {
           ok: false,
           error,
         });
+        this.deps.metrics?.toolCalls(name, false);
+        this.deps.metrics?.toolDuration(name, Date.now() - startedAt);
         return { ok: false, error };
       }
     }
@@ -115,6 +122,8 @@ export class ToolExecutor {
           error: result.error,
         });
       }
+      this.deps.metrics?.toolCalls(name, result.ok);
+      this.deps.metrics?.toolDuration(name, Date.now() - startedAt);
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -125,6 +134,8 @@ export class ToolExecutor {
         ok: false,
         error: message,
       });
+      this.deps.metrics?.toolCalls(name, false);
+      this.deps.metrics?.toolDuration(name, Date.now() - startedAt);
       return { ok: false, error: message };
     }
   }

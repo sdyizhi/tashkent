@@ -56,6 +56,17 @@ export class SessionRepository {
     return rows.map(toSummary);
   }
 
+  /**
+   * 会话总数。
+   *
+   * 指标埋点（tashkent_active_sessions）需要这个数字：
+   * 用 COUNT 而不是 list().length，避免每次写请求都把整张表读进内存。
+   */
+  count(): number {
+    const row = this.db.prepare('SELECT COUNT(*) AS n FROM sessions').get() as { n: number };
+    return row.n;
+  }
+
   touch(id: string, at: number = Date.now()): void {
     this.db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(at, id);
   }

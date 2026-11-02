@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { CreateSessionRequest, SendMessageResponse } from '@tashkent/shared';
 import type { MessageRepository } from '../db/repositories/messages.js';
 import type { SessionRepository } from '../db/repositories/sessions.js';
+import { metrics } from '../lib/metrics.js';
 
 export interface SessionDeps {
   sessions: SessionRepository;
@@ -22,6 +23,8 @@ export function sessionRoutes(deps: SessionDeps) {
       return c.json({ error: { code: 'BAD_REQUEST', message: 'agentId 必填' } }, 400);
     }
     const session = deps.sessions.create({ agentId: body.agentId });
+    // 活跃会话数变化时同步指标（设计文档 7.3）
+    metrics.activeSessions(deps.sessions.count());
     return c.json(session, 201);
   });
 
@@ -34,6 +37,7 @@ export function sessionRoutes(deps: SessionDeps) {
 
   app.delete('/api/sessions/:id', (c) => {
     deps.sessions.remove(c.req.param('id'));
+    metrics.activeSessions(deps.sessions.count());
     return c.json({ ok: true });
   });
 

@@ -10,6 +10,7 @@ import { AgentRunner } from './agent/runner.js';
 import { createOpenAIProvider } from './agent/providers/openai.js';
 import { createLlmHealthProbe } from './lib/llm-health.js';
 import { logger } from './lib/logger.js';
+import { metrics } from './lib/metrics.js';
 import { WindowService } from './services/window-service.js';
 import { AuthzService } from './services/authz-service.js';
 import { createFsTools } from './tools/fs.js';
@@ -107,6 +108,8 @@ export function createRuntime(deps: RuntimeDeps) {
     },
     // 工具执行日志（设计文档 7.1）：通过依赖注入传入，不让执行器依赖全局单例
     logger,
+    // 指标埋点（设计文档 7.3）
+    metrics,
   });
 
   const provider = createOpenAIProvider({
@@ -137,10 +140,18 @@ export function createRuntime(deps: RuntimeDeps) {
     maxInputTokens: config.maxInputTokens,
     toolResultMaxBytes: config.toolResultMaxBytes,
     maxSteps: config.maxSteps,
+    metrics,
   });
 
   fs.mkdirSync(path.resolve(config.workspaceDir), { recursive: true });
   fs.mkdirSync(path.resolve(config.artifactsDir), { recursive: true });
+
+  // 活跃会话数（设计文档 7.3 的 tashkent_active_sessions）：会话表变化时同步
+  try {
+    metrics.activeSessions(sessions.count());
+  } catch {
+    // 数据库不可用时保持上一次的读数
+  }
 
   return {
     db: deps.db,
@@ -156,6 +167,8 @@ export function createRuntime(deps: RuntimeDeps) {
     messages,
     sessions,
     desktopState,
+    /** 指标收集器（设计文档 7.3） */
+    metrics,
     /** 工作区根目录（文件浏览 / 写入的沙箱边界） */
     workspaceDir: path.resolve(config.workspaceDir),
   };
