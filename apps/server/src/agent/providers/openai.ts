@@ -49,17 +49,26 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
      */
     async probe(): Promise<void> {
       await generateText({
-        model: openai(opts.probeModel ?? 'gpt-4o-mini'),
+        model: openai.chat(opts.probeModel ?? 'gpt-4o-mini'),
         prompt: 'ping',
-        maxOutputTokens: 1,
+        // reasoning 模型会先消耗 token 思考；上限太小会只出 thinking 而 0 正文，
+        // 导致 generateText 报「无内容」错。调大到能兼顾思考 + 正文。
+        maxOutputTokens: 256,
       });
     },
 
     async *stream(req: LLMRequest): AsyncIterable<LLMChunk> {
-      const model = openai(req.model);
+      const model = openai.chat(req.model);
 
       const tools: ToolSet = {};
+      // OpenAI 兼容接口要求工具名只能含字母/数字/下划线（^[a-zA-Z0-9_-]+$），
+      // 而项目工具名用点号分层（如 fs.read / desktop.open_app），
+      // AI SDK 会直接抛「invalid function name」。
+      // 这里在 provider 边界做映射：发给模型用下划线名，执行与事件回真实名。
+      const realBySafe = new Map<string, string>();
       for (const t of req.tools) {
+        const safeName = t.name.replace(/\./g, '_');
+        realBySafe.set(safeName, t.name);
         const defined: Tool<any, any, any> = aiTool<any, any, any>({
           description: t.description,
           inputSchema: t.inputSchema as FlexibleSchema,
@@ -73,8 +82,9 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
             return (await req.executeTool(t.name, input, options.toolCallId)) as never;
           },
         });
-        tools[t.name] = defined;
+        tools[safeName] = defined;
       }
+      const realName = (safe: string) => realBySafe.get(safe) ?? safe;
 
       const result = streamText({
         model,
@@ -99,7 +109,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
             yield {
               type: 'tool-call',
               toolCallId: part.toolCallId,
-              toolName: part.toolName,
+              toolName: realName(part.toolName),
               args: part.input,
             };
             break;
@@ -107,7 +117,7 @@ export function createOpenAIProvider(opts: OpenAIProviderOptions): LLMProvider {
             yield {
               type: 'tool-result',
               toolCallId: part.toolCallId,
-              toolName: part.toolName,
+              toolName: realName(part.toolName),
               result: part.output,
             };
             break;

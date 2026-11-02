@@ -34,6 +34,8 @@ export interface RunnerDeps {
   toolResultMaxBytes: number;
   /** 单次运行的工具调用轮数上限（agent 可用 maxSteps 覆盖） */
   maxSteps: number;
+  /** 默认模型 id（取 config.model）；agent 未覆盖时使用 */
+  defaultModel: string;
   /** 指标收集器（设计文档 7.3）；未注入时不埋点 */
   metrics?: MetricsRegistry;
 }
@@ -105,7 +107,7 @@ export class AgentRunner {
       const tools = this.deps.registry.pick(input.agent.toolIds);
 
       const stream = this.deps.provider.stream({
-        model: input.agent.model ?? 'gpt-4o-mini',
+        model: input.agent.model ?? this.deps.defaultModel,
         system: input.agent.systemPrompt,
         messages: messages,
         tools: tools.map((t) => ({

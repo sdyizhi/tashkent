@@ -124,6 +124,9 @@ export function createRuntime(deps: RuntimeDeps) {
     probe: async () => {
       if (!provider.probe) throw new Error('provider 不支持探测');
       await provider.probe();
+      // 探测成功即视为可达；health 的 ok 判定是 outcome?.ok === true，
+      // 若只返回 void 会永远判为不可用（bug）。
+      return { ok: true };
     },
   });
 
@@ -140,6 +143,7 @@ export function createRuntime(deps: RuntimeDeps) {
     maxInputTokens: config.maxInputTokens,
     toolResultMaxBytes: config.toolResultMaxBytes,
     maxSteps: config.maxSteps,
+    defaultModel: config.model,
     metrics,
   });
 

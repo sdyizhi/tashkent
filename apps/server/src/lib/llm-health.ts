@@ -28,7 +28,9 @@ export interface LlmHealthResult {
   latencyMs: number | null;
 }
 
-const DEFAULT_TIMEOUT_MS = 3000;
+// 探测超时：reasoning 模型光思考就要 ~3s，3s 会误判为不可用。
+// 放宽到 10s，配合 30s 缓存，健康检查不会频繁打外网。
+const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_CACHE_MS = 30000;
 
 /**
