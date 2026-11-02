@@ -83,7 +83,9 @@ describe('OpenAI provider 可达性探测', () => {
     await provider.probe!();
     expect(generateCalls).toHaveLength(1);
     expect(generateCalls[0]?.prompt).toBe('ping');
-    expect(generateCalls[0]?.maxOutputTokens).toBe(1);
+    // 与 openai.ts probe() 的实现保持一致：256 是为了给 reasoning 模型
+    // 留出思考 token 预算（上限太小会只出 thinking 而 0 正文，导致报「无内容」错）。
+    expect(generateCalls[0]?.maxOutputTokens).toBe(256);
   });
 
   it('probe 失败时抛出错误', async () => {
