@@ -22,6 +22,16 @@ export interface AppConfig {
   dbFile: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   metricsEnabled: boolean;
+  /** 口令保护：为空表示不启用（本地开发便利） */
+  authPassword: string;
+  /** 会话 Cookie 签名密钥；为空时进程内随机生成（重启后旧会话失效） */
+  authCookieSecret: string;
+  /** 会话有效期（毫秒） */
+  authSessionTtlMs: number;
+  /** 限流：窗口长度（毫秒） */
+  rateLimitWindowMs: number;
+  /** 限流：窗口内允许的最大请求数 */
+  rateLimitMax: number;
   version: string;
 }
 
@@ -65,6 +75,11 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     dbFile: env.DB_FILE ?? 'data/tashkent.db',
     logLevel: (env.LOG_LEVEL as AppConfig['logLevel']) ?? 'info',
     metricsEnabled: bool(env.METRICS_ENABLED, false),
+    authPassword: env.AUTH_PASSWORD ?? '',
+    authCookieSecret: env.AUTH_COOKIE_SECRET ?? '',
+    authSessionTtlMs: num(env.AUTH_SESSION_TTL_MS, 7 * 24 * 3600 * 1000),
+    rateLimitWindowMs: num(env.RATE_LIMIT_WINDOW_MS, 60_000),
+    rateLimitMax: num(env.RATE_LIMIT_MAX, 10),
     version: '1.0.0',
   };
 }

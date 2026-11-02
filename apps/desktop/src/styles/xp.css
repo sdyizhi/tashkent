@@ -615,6 +615,35 @@ body {
   font-weight: bold;
 }
 
+/* ---- 口令登录框 ---- */
+
+.xp-login-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.xp-login-field input {
+  flex: 1;
+  height: 20px;
+  padding: 1px 4px;
+  border: 1px solid #7a7a7a;
+  background: #fff;
+  font-family: var(--xp-font);
+  font-size: var(--xp-font-size);
+}
+
+.xp-login-field input:focus {
+  outline: 1px dotted #333;
+  outline-offset: -3px;
+}
+
+.xp-login-error {
+  color: #c0392b;
+  font-size: var(--xp-font-size);
+}
+
 /* ---- 错误边界降级面板 ---- */
 
 .xp-error-boundary {

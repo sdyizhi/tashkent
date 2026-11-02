@@ -30,4 +30,30 @@ describe('loadConfig', () => {
     expect(loadConfig({ SHELL_ENABLED: 'true' }).shellEnabled).toBe(true);
     expect(loadConfig({ SHELL_ENABLED: 'false' }).shellEnabled).toBe(false);
   });
+
+  it('未设置 AUTH_PASSWORD 时口令保护关闭', () => {
+    const cfg = loadConfig({});
+    expect(cfg.authPassword).toBe('');
+    expect(cfg.authCookieSecret).toBe('');
+  });
+
+  it('读取 AUTH_PASSWORD 与 AUTH_COOKIE_SECRET', () => {
+    const cfg = loadConfig({ AUTH_PASSWORD: 'secret', AUTH_COOKIE_SECRET: 'cookie-secret' });
+    expect(cfg.authPassword).toBe('secret');
+    expect(cfg.authCookieSecret).toBe('cookie-secret');
+  });
+
+  it('限流参数可配且有默认值', () => {
+    const def = loadConfig({});
+    expect(def.rateLimitWindowMs).toBe(60000);
+    expect(def.rateLimitMax).toBe(10);
+    const cfg = loadConfig({ RATE_LIMIT_WINDOW_MS: '1000', RATE_LIMIT_MAX: '3' });
+    expect(cfg.rateLimitWindowMs).toBe(1000);
+    expect(cfg.rateLimitMax).toBe(3);
+  });
+
+  it('METRICS_ENABLED 接受字符串 "true"', () => {
+    expect(loadConfig({ METRICS_ENABLED: 'true' }).metricsEnabled).toBe(true);
+    expect(loadConfig({}).metricsEnabled).toBe(false);
+  });
 });
